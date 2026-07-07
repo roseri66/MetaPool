@@ -1,0 +1,86 @@
+# ============================================================
+# SmartPool — Prometheus 告警规则（SPEC-19）
+# 6 条规则覆盖资源耗尽/泄露/连接超时/队列积压/拒绝/锁竞争
+# ============================================================
+
+groups:
+  - name: smartpool-alerts
+    rules:
+      # ── 1. 资源池耗尽 ──
+      - alert: PoolExhausted
+        expr: smartpool_thread_pending_count > 100
+        for: 1m
+        labels:
+          severity: critical
+          category: pool
+        annotations:
+          summary: "SmartPool 资源池耗尽 — pending 请求超过阈值"
+          description: >
+            资源池 {{ $labels.pool_name }} 的 pending 请求数已达 {{ $value }}，
+            持续超过 1 分钟。请检查线程池/连接池配置或下游依赖健康状况。
+
+      # ── 2. 资源泄露检测 ──
+      - alert: ResourceLeakDetected
+        expr: smartpool_db_connection_leak_total > 0
+        for: 1m
+        labels:
+          severity: warning
+          category: leak
+        annotations:
+          summary: "SmartPool 检测到资源泄露"
+          description: >
+            资源池 {{ $labels.pool_name }} 检测到连接泄露，泄露计数 {{ $value }}。
+            请检查业务代码是否在所有路径（含异常路径）中正确归还资源。
+
+      # ── 3. 连接获取超时 ──
+      - alert: ConnectionTimeout
+        expr: rate(smartpool_db_connection_timeout_total[5m]) * 300 > 10
+        for: 1m
+        labels:
+          severity: critical
+          category: connection
+        annotations:
+          summary: "SmartPool 连接获取超时频发"
+          description: >
+            资源池 {{ $labels.pool_name }} 在过去 5 分钟内连接超时次数 > 10 次。
+            请检查数据库连接数上限（max_connections）和池 max-pool-size 配置。
+
+      # ── 4. 队列深度过高 ──
+      - alert: HighQueueDepth
+        expr: (smartpool_thread_queue_size / smartpool_thread_queue_capacity) > 0.9
+        for: 1m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "SmartPool 任务队列积压严重 — 使用率超过 90%"
+          description: >
+            线程池 {{ $labels.pool_name }} 队列使用率 {{ $value | humanizePercentage }}。
+            当前队列深度 {{ $labels.queue_size }}/{{ $labels.queue_capacity }}。
+            考虑增大 max-pool-size 或优化下游处理速度。
+
+      # ── 5. 线程池任务拒绝 ──
+      - alert: ThreadPoolRejection
+        expr: rate(smartpool_thread_rejected_total[5m]) * 300 > 100
+        for: 1m
+        labels:
+          severity: critical
+          category: rejection
+        annotations:
+          summary: "SmartPool 线程池大量拒绝任务"
+          description: >
+            线程池 {{ $labels.pool_name }} 在过去 5 分钟内拒绝任务 > 100 次。
+            请检查拒绝策略配置、队列容量、max-pool-size 是否合理。
+
+      # ── 6. 分布式锁高竞争 ──
+      - alert: LockHighContention
+        expr: smartpool_lock_contention_count > 10
+        for: 2m
+        labels:
+          severity: warning
+          category: lock
+        annotations:
+          summary: "SmartPool 分布式锁竞争激烈"
+          description: >
+            锁 {{ $labels.lock_name }} 当前等待线程数 {{ $value }}，持续超过 2 分钟。
+            请检查锁持有时间是否过长，或考虑拆分锁粒度。

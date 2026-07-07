@@ -1,0 +1,8 @@
+com.smartpool.starter.SmartPoolAutoConfiguration
+com.smartpool.starter.config.ThreadPoolAutoConfiguration
+com.smartpool.starter.config.DbPoolAutoConfiguration
+com.smartpool.starter.config.RedisPoolAutoConfiguration
+com.smartpool.starter.config.ObjectPoolAutoConfiguration
+com.smartpool.starter.config.MemoryPoolAutoConfiguration
+com.smartpool.starter.config.RateLimitAutoConfiguration
+com.smartpool.starter.config.LockAutoConfiguration

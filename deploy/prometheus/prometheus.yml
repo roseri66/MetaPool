@@ -1,0 +1,39 @@
+# ============================================================
+# SmartPool — Prometheus 主配置
+# 抓取规则 + 告警规则引用
+# ============================================================
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+# ── 告警规则文件 ──
+rule_files:
+  - "/etc/prometheus/prometheus-alert-rules.yml"
+
+# ── 抓取目标 ──
+scrape_configs:
+  # SmartPool Java 应用（Agent 暴露的 Prometheus 端点）
+  - job_name: "smartpool-app"
+    metrics_path: "/actuator/prometheus"
+    scrape_interval: 10s
+    static_configs:
+      - targets:
+          - "host.docker.internal:9100"
+        labels:
+          application: "smartpool"
+          environment: "dev"
+
+  # Prometheus 自身指标
+  - job_name: "prometheus"
+    static_configs:
+      - targets:
+          - "localhost:9090"
+
+# ── AlertManager 配置 ──
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "alertmanager:9093"

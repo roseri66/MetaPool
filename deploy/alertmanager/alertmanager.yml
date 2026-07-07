@@ -1,0 +1,27 @@
+# ============================================================
+# SmartPool — AlertManager 配置
+# 告警路由：按严重级别分组，默认发送到控制台（V1 无外部渠道）
+# ============================================================
+
+route:
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 4h
+
+  receiver: "console"
+
+  routes:
+    - match:
+        severity: critical
+      group_wait: 5s
+      repeat_interval: 1h
+      receiver: "console"
+
+    - match:
+        severity: warning
+      repeat_interval: 4h
+      receiver: "console"
+
+receivers:
+  - name: "console"
