@@ -1,0 +1,128 @@
+# ============================================================
+# SmartPool — 开发环境 Docker Compose
+# 用途：本地开发时一键启动全部中间件，Java 应用由 IDEA 直接启动
+# 启动：docker compose -f docker-compose.dev.yml up -d
+# 停止：docker compose -f docker-compose.dev.yml down
+# ============================================================
+
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────────────────
+  # PostgreSQL 17.4 — 数据库连接池验证目标
+  # ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:17.4-alpine
+    container_name: smartpool-pg-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartpool}
+      POSTGRES_USER: ${POSTGRES_USER:-smartpool}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartpool_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartpool} -d ${POSTGRES_DB:-smartpool}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartpool-net
+
+  # ─────────────────────────────────────────────────────────
+  # Redis 7.2.8 — 分布式锁 + Redis 连接池验证目标
+  # ─────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2.8-alpine
+    container_name: smartpool-redis-dev
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata-dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartpool-net
+
+  # ─────────────────────────────────────────────────────────
+  # Prometheus 3.2.0 — 指标拉取 + 告警规则评估
+  # ─────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.2.0
+    container_name: smartpool-prom-dev
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_DAYS:-15}d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/prometheus-alert-rules.yml:/etc/prometheus/prometheus-alert-rules.yml:ro
+      - promdata-dev:/prometheus
+    networks:
+      - smartpool-net
+
+  # ─────────────────────────────────────────────────────────
+  # AlertManager 0.28.0 — 告警聚合/去重/路由
+  # ─────────────────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    container_name: smartpool-alert-dev
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertdata-dev:/alertmanager
+    networks:
+      - smartpool-net
+
+  # ─────────────────────────────────────────────────────────
+  # Grafana 11.6.0 — 仪表板可视化
+  # ─────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: smartpool-grafana-dev
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/global-health.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - ./grafana/dashboards/thread-pool.json:/etc/grafana/dashboards/thread-pool.json:ro
+      - ./grafana/dashboards/connection-pool.json:/etc/grafana/dashboards/connection-pool.json:ro
+      - ./grafana/dashboards/global-health.json:/etc/grafana/dashboards/global-health.json:ro
+      - grafanadata-dev:/var/lib/grafana
+    networks:
+      - smartpool-net
+
+volumes:
+  pgdata-dev:
+  redisdata-dev:
+  promdata-dev:
+  alertdata-dev:
+  grafanadata-dev:
+
+networks:
+  smartpool-net:
+    name: smartpool-net
+    driver: bridge
