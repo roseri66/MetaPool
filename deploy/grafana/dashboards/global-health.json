@@ -63,7 +63,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_active_count",
+          "expr": "metapool_thread_active_count",
           "refId": "A"
         }
       ]
@@ -91,7 +91,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_db_active_connections",
+          "expr": "metapool_db_active_connections",
           "refId": "A"
         }
       ]
@@ -119,7 +119,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_redis_active_connections",
+          "expr": "metapool_redis_active_connections",
           "refId": "A"
         }
       ]
@@ -145,13 +145,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_rate_pass_total[1m])",
+          "expr": "rate(metapool_rate_pass_total[1m])",
           "legendFormat": "通过速率",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_rate_reject_total[1m])",
+          "expr": "rate(metapool_rate_reject_total[1m])",
           "legendFormat": "拒绝速率",
           "refId": "B"
         }
@@ -180,7 +180,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_memory_used_bytes",
+          "expr": "metapool_memory_used_bytes",
           "refId": "A"
         }
       ]
@@ -208,7 +208,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_lock_contention_count",
+          "expr": "metapool_lock_contention_count",
           "refId": "A"
         }
       ]
@@ -236,19 +236,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_active_count",
+          "expr": "metapool_thread_active_count",
           "legendFormat": "线程池",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_db_active_connections",
+          "expr": "metapool_db_active_connections",
           "legendFormat": "DB 连接池",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_redis_active_connections",
+          "expr": "metapool_redis_active_connections",
           "legendFormat": "Redis 连接池",
           "refId": "C"
         }
@@ -270,19 +270,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_queue_size",
+          "expr": "metapool_thread_queue_size",
           "legendFormat": "线程队列",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_db_pending_requests",
+          "expr": "metapool_db_pending_requests",
           "legendFormat": "DB 等待",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_redis_pending_requests",
+          "expr": "metapool_redis_pending_requests",
           "legendFormat": "Redis 等待",
           "refId": "C"
         }
@@ -311,13 +311,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_rate_reject_total[5m]) * 300",
+          "expr": "rate(metapool_rate_reject_total[5m]) * 300",
           "legendFormat": "拒绝数 (5m)",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_rate_pass_total[5m]) * 300",
+          "expr": "rate(metapool_rate_pass_total[5m]) * 300",
           "legendFormat": "通过数 (5m)",
           "refId": "B"
         }
@@ -339,13 +339,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_lock_contention_count",
+          "expr": "metapool_lock_contention_count",
           "legendFormat": "等待线程数",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_lock_acquire_total[5m]) * 300",
+          "expr": "rate(metapool_lock_acquire_total[5m]) * 300",
           "legendFormat": "加锁速率 (5m)",
           "refId": "B"
         }
@@ -373,7 +373,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_db_connection_leak_total + smartpool_redis_connection_leak_total",
+          "expr": "metapool_db_connection_leak_total + metapool_redis_connection_leak_total",
           "legendFormat": "泄露总数",
           "refId": "A"
         }
@@ -401,7 +401,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_rejected_total + smartpool_rate_reject_total",
+          "expr": "metapool_thread_rejected_total + metapool_rate_reject_total",
           "legendFormat": "拒绝总数",
           "refId": "A"
         }
@@ -429,7 +429,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_lock_timeout_total",
+          "expr": "metapool_lock_timeout_total",
           "legendFormat": "超时",
           "refId": "A"
         }
@@ -438,14 +438,14 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smartpool", "global-health"],
+  "tags": ["metapool", "global-health"],
   "templating": {
     "list": []
   },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SmartPool — 全局健康总览",
-  "uid": "smartpool-global-health",
+  "title": "MetaPool — 全局健康总览",
+  "uid": "metapool-global-health",
   "version": 1
 }

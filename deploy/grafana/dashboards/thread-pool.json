@@ -56,7 +56,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_active_count",
+          "expr": "metapool_thread_active_count",
           "legendFormat": "活跃线程",
           "refId": "A"
         }
@@ -83,7 +83,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_pool_size",
+          "expr": "metapool_thread_pool_size",
           "legendFormat": "池大小",
           "refId": "A"
         }
@@ -112,7 +112,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_queue_size",
+          "expr": "metapool_thread_queue_size",
           "legendFormat": "排队数",
           "refId": "A"
         }
@@ -140,7 +140,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_thread_rejected_total[5m]) * 300",
+          "expr": "rate(metapool_thread_rejected_total[5m]) * 300",
           "legendFormat": "拒绝数(5m)",
           "refId": "A"
         }
@@ -162,7 +162,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_thread_completed_total[1m])",
+          "expr": "rate(metapool_thread_completed_total[1m])",
           "legendFormat": "完成速率 (ops/s)",
           "refId": "A"
         }
@@ -184,7 +184,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(smartpool_thread_rejected_total[1m])",
+          "expr": "rate(metapool_thread_rejected_total[1m])",
           "legendFormat": "拒绝速率 (ops/s)",
           "refId": "A"
         }
@@ -206,19 +206,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.50, rate(smartpool_thread_queue_wait_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.50, rate(metapool_thread_queue_wait_seconds_bucket[5m]))",
           "legendFormat": "P50 等待时间",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, rate(smartpool_thread_queue_wait_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, rate(metapool_thread_queue_wait_seconds_bucket[5m]))",
           "legendFormat": "P95 等待时间",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.99, rate(smartpool_thread_queue_wait_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.99, rate(metapool_thread_queue_wait_seconds_bucket[5m]))",
           "legendFormat": "P99 等待时间",
           "refId": "C"
         }
@@ -240,13 +240,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_pool_size",
+          "expr": "metapool_thread_pool_size",
           "legendFormat": "池大小",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartpool_thread_active_count",
+          "expr": "metapool_thread_active_count",
           "legendFormat": "活跃线程",
           "refId": "B"
         }
@@ -255,14 +255,14 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smartpool", "thread-pool"],
+  "tags": ["metapool", "thread-pool"],
   "templating": {
     "list": []
   },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SmartPool — 线程池监控",
-  "uid": "smartpool-thread-pool",
+  "title": "MetaPool — 线程池监控",
+  "uid": "metapool-thread-pool",
   "version": 1
 }

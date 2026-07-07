@@ -1,0 +1,23 @@
+# ============================================================
+# MetaPool — 开发环境配置
+# 激活方式：spring.profiles.active=dev（默认）
+# 使用场景：本地 IDEA 启动，中间件由 docker-compose.dev.yml 提供
+# ============================================================
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/metapool
+    username: metapool
+    password: ${METAPOOL_DB_PASSWORD:metapool_dev}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${METAPOOL_REDIS_PASSWORD:}
+
+logging:
+  level:
+    com.metapool: DEBUG
+    io.micrometer: INFO
+    net.bytebuddy: WARN

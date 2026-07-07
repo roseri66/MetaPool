@@ -1,5 +1,5 @@
 # ============================================================
-# SmartPool — Prometheus 主配置
+# MetaPool — Prometheus 主配置
 # 抓取规则 + 告警规则引用
 # ============================================================
 
@@ -14,15 +14,15 @@ rule_files:
 
 # ── 抓取目标 ──
 scrape_configs:
-  # SmartPool Java 应用（Agent 暴露的 Prometheus 端点）
-  - job_name: "smartpool-app"
+  # MetaPool Java 应用（Agent 暴露的 Prometheus 端点）
+  - job_name: "metapool-app"
     metrics_path: "/actuator/prometheus"
     scrape_interval: 10s
     static_configs:
       - targets:
           - "host.docker.internal:9100"
         labels:
-          application: "smartpool"
+          application: "metapool"
           environment: "dev"
 
   # Prometheus 自身指标

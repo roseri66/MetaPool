@@ -1,0 +1,78 @@
+# ============================================================
+# MetaPool — 资源池默认配置
+# 所有参数均可运行时通过 Actuator 端点动态修改
+# ============================================================
+
+metapool:
+  # ── 全局通用 ──
+  enabled: true
+  metrics:
+    export-interval-seconds: 15
+  health:
+    check-interval-seconds: 30
+
+  # ── 线程池 ──
+  thread:
+    enabled: true
+    pool-name: metapool-thread
+    core-pool-size: 10
+    max-pool-size: 50
+    keep-alive-seconds: 60
+    queue-capacity: 1000
+    rejected-policy: CALLER_RUNS
+    thread-name-prefix: metapool-worker-
+
+  # ── 数据库连接池 ──
+  db:
+    enabled: true
+    pool-name: metapool-db
+    min-idle: 5
+    max-pool-size: 20
+    max-lifetime-minutes: 30
+    idle-timeout-seconds: 600
+    connection-timeout-seconds: 30
+    validation-timeout-seconds: 5
+    leak-detection-threshold-seconds: 60
+
+  # ── Redis 连接池 ──
+  redis:
+    enabled: true
+    pool-name: metapool-redis
+    min-idle: 5
+    max-pool-size: 20
+    max-lifetime-minutes: 30
+    idle-timeout-seconds: 600
+    connection-timeout-seconds: 10
+    leak-detection-threshold-seconds: 60
+
+  # ── 通用对象池 ──
+  object:
+    enabled: true
+    pool-name: metapool-object
+    min-idle: 2
+    max-pool-size: 32
+    idle-timeout-seconds: 300
+    lifo: true
+
+  # ── 内存池 ──
+  memory:
+    enabled: true
+    pool-name: metapool-memory
+    max-direct-memory-mb: 256
+    page-size-kb: 64
+    idle-timeout-seconds: 300
+
+  # ── 限流器 ──
+  rate-limit:
+    enabled: true
+    algorithm: TOKEN_BUCKET
+    permits-per-second: 1000
+    warm-up-seconds: 10
+
+  # ── 分布式锁 ──
+  lock:
+    enabled: true
+    default-ttl-seconds: 30
+    renewal-interval-seconds: 10
+    max-retry-count: 3
+    retry-interval-millis: 100

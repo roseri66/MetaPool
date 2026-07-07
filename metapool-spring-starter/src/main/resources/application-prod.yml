@@ -1,0 +1,29 @@
+# ============================================================
+# MetaPool — 生产/演示环境配置
+# 激活方式：spring.profiles.active=prod
+# 使用场景：Docker Compose 全量容器化部署
+# ============================================================
+
+spring:
+  datasource:
+    url: jdbc:postgresql://metapool-pg:5432/metapool
+    username: ${METAPOOL_DB_USERNAME}
+    password: ${METAPOOL_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: metapool-redis
+      port: 6379
+      password: ${METAPOOL_REDIS_PASSWORD}
+
+logging:
+  level:
+    com.metapool: INFO
+    io.micrometer: WARN
+    net.bytebuddy: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metapool

@@ -1,4 +1,4 @@
-# SmartPool 开发进度
+# MetaPool 开发进度
 
 > 2026-07-07 | **20/20 Spec 完成** 🎉 | 总测试 261 用例 0 失败 | JMH 基准 4 模块
 >
@@ -10,29 +10,29 @@
 
 | 模块 | Spec | 测试数 | JMH 基准 |
 |------|------|:--:|:--:|
-| smartpool-common | SPEC-01~05（生命周期、抽象基类、SPI、异常、枚举） | 26 | — |
-| smartpool-pool-thread | SPEC-06 自研线程池 | 17 | ✅ ThreadPoolBenchmark |
-| smartpool-pool-db | SPEC-07 数据库连接池 | 14 | 高并发压力测试 |
-| smartpool-pool-redis | SPEC-08 Redis 连接池 | 12 | 高并发压力测试 |
-| smartpool-pool-object | SPEC-09 通用对象池 | 17 | ✅ ObjectPoolBenchmark |
-| smartpool-pool-rate-limit | SPEC-11 令牌桶限流器 | 10 | ✅ RateLimiterBenchmark |
-| smartpool-pool-lock | SPEC-12 分布式锁 | 29 | 已有并发测试 |
-| smartpool-pool-memory | SPEC-10 内存资源池 | 26 | ✅ MemoryPoolBenchmark |
-| smartpool-spi-ai | SPEC-17 AI 诊断 SPI 接口 | 28 | — |
-| smartpool-spi-alert | SPEC-18 告警渠道 SPI 接口 | 9 | — |
-| smartpool-agent-core | SPEC-13 Agent 字节码拦截 | 24 | — |
-| smartpool-agent-core | SPEC-14 Prometheus 指标暴露 | 27 | — |
+| metapool-common | SPEC-01~05（生命周期、抽象基类、SPI、异常、枚举） | 26 | — |
+| metapool-pool-thread | SPEC-06 自研线程池 | 17 | ✅ ThreadPoolBenchmark |
+| metapool-pool-db | SPEC-07 数据库连接池 | 14 | 高并发压力测试 |
+| metapool-pool-redis | SPEC-08 Redis 连接池 | 12 | 高并发压力测试 |
+| metapool-pool-object | SPEC-09 通用对象池 | 17 | ✅ ObjectPoolBenchmark |
+| metapool-pool-rate-limit | SPEC-11 令牌桶限流器 | 10 | ✅ RateLimiterBenchmark |
+| metapool-pool-lock | SPEC-12 分布式锁 | 29 | 已有并发测试 |
+| metapool-pool-memory | SPEC-10 内存资源池 | 26 | ✅ MemoryPoolBenchmark |
+| metapool-spi-ai | SPEC-17 AI 诊断 SPI 接口 | 28 | — |
+| metapool-spi-alert | SPEC-18 告警渠道 SPI 接口 | 9 | — |
+| metapool-agent-core | SPEC-13 Agent 字节码拦截 | 24 | — |
+| metapool-agent-core | SPEC-14 Prometheus 指标暴露 | 27 | — |
 | deploy/ | SPEC-15 Grafana Dashboard (3 JSON) | — | — |
 | deploy/ | SPEC-19 Prometheus 告警规则 (6 rules) | — | — |
 | deploy/ | SPEC-20 Docker Compose 部署配置 (dev+prod) | — | — |
-| smartpool-spring-starter | SPEC-16 Spring Boot Starter（自动装配、配置绑定、健康检查、Actuator 端点、全局异常处理） | 22 | — |
+| metapool-spring-starter | SPEC-16 Spring Boot Starter（自动装配、配置绑定、健康检查、Actuator 端点、全局异常处理） | 22 | — |
 
 ---
 
 ## JMH 基准测试结果 (2026-07-07，最新)
 
 ### 线程池 — SmartThreadPoolExecutor vs JDK（✅ 已优化：双检锁消除热路径锁竞争）
-| Benchmark | SmartPool (ops/s) | JDK (ops/s) | SmartPool/JDK |
+| Benchmark | MetaPool (ops/s) | JDK (ops/s) | MetaPool/JDK |
 |-----------|------------------:|------------:|:--:|
 | 单线程 | 47.8M | 99.5M | 48% |
 | 4 线程 | 30.8M | 59.7M | 52% |
@@ -79,7 +79,7 @@
 
 无 — 全部 20 个 Spec 已完成 🎉
 
-> **项目交付物清单**：13 个 Maven 模块 + deploy/ 目录（Docker Compose ×2、Prometheus 配置 ×2、AlertManager 配置 ×1、Grafana Dashboard ×3 + Datasource ×1）+ 应用配置（application.yml / application-dev.yml / application-prod.yml / application-smartpool.yml / logback-spring.xml）
+> **项目交付物清单**：13 个 Maven 模块 + deploy/ 目录（Docker Compose ×2、Prometheus 配置 ×2、AlertManager 配置 ×1、Grafana Dashboard ×3 + Datasource ×1）+ 应用配置（application.yml / application-dev.yml / application-prod.yml / application-metapool.yml / logback-spring.xml）
 
 ---
 
@@ -94,8 +94,8 @@ export JAVA_HOME="/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1"
 mvn test -pl {module} -am
 
 # 运行 JMH 基准测试示例：
-SMARTPOOL="C:/Users/徐傲轩/Desktop/智能多资源管理系统/smartpool"
+METAPOOL="C:/Users/徐傲轩/Desktop/智能多资源管理系统/metapool"
 M2="C:/Users/徐傲轩/.m2/repository"
-CP="$SMARTPOOL/{module}/target/test-classes;$SMARTPOOL/{module}/target/classes;..."
+CP="$METAPOOL/{module}/target/test-classes;$METAPOOL/{module}/target/classes;..."
 java -cp "$CP" org.openjdk.jmh.Main -f 1 -wi 3 -i 5 {BenchmarkClass}
 ```
