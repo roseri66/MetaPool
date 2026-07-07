@@ -45,3 +45,4 @@ backups/**/*.jar
 # Temp
 /tmp/
 *.tmp
+README.zip
