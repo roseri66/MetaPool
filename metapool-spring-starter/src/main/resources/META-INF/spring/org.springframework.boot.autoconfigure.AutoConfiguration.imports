@@ -1,0 +1,8 @@
+com.metapool.starter.MetaPoolAutoConfiguration
+com.metapool.starter.config.ThreadPoolAutoConfiguration
+com.metapool.starter.config.DbPoolAutoConfiguration
+com.metapool.starter.config.RedisPoolAutoConfiguration
+com.metapool.starter.config.ObjectPoolAutoConfiguration
+com.metapool.starter.config.MemoryPoolAutoConfiguration
+com.metapool.starter.config.RateLimitAutoConfiguration
+com.metapool.starter.config.LockAutoConfiguration

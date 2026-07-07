@@ -1,30 +1,312 @@
-# SmartPool — 智能多资源池统一管理系统
+# MetaPool — 智能多资源池统一管理系统
 
 [![JDK](https://img.shields.io/badge/JDK-17.0.14-orange)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.3-brightgreen)](https://spring.io/projects/spring-boot)
 [![Maven](https://img.shields.io/badge/Maven-3.9-blue)](https://maven.apache.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-261%20passed-brightgreen)](.)
-[![Coverage](https://img.shields.io/badge/Coverage-20%2F20%20Specs%20Complete-success)](.)
+[![Specs](https://img.shields.io/badge/Specs-20%2F20%20Complete-success)](.)
 
-> **一站式资源池管理平台** — 自研 7 类资源池 + Java Agent 可观测 + Prometheus/Grafana 监控大盘 + Docker Compose 一键部署。
+> **一站式资源池集成平台** — 7 类异构资源池统一抽象、统一配置、统一监控。
 >
-> 对标组件：JDK ThreadPoolExecutor · HikariCP · Jedis/Lettuce · Apache Commons Pool2
+> 不是又一个池化框架，而是一套**集成方案**：当你需要在项目里同时管理线程池、数据库连接池、Redis 连接池、限流器、分布式锁、内存池和对象池时，不必分别引入 HikariCP、Jedis、Commons Pool2、Guava RateLimiter、Redisson 并各自配置运维——MetaPool 用一个抽象层把它们统一起来，一套 YAML 配置全部生效，一个 Grafana 大盘看到所有资源。
 >
-> **零付费依赖 · 100% OSI 开源协议 · 单机即可运行**
+> **零付费依赖 · 100% OSI 开源协议 · Spring Boot Starter 开箱即用**
 
 ---
 
 ## 目录
 
+- [为什么做 MetaPool —— 集成设计的由来](#为什么做-metapool--集成设计的由来)
+- [集成架构详解](#集成架构详解)
 - [架构总览](#架构总览)
 - [模块清单](#模块清单)
 - [快速开始](#快速开始)
 - [配置参考](#配置参考)
 - [可观测性](#可观测性)
-- [性能基准](#性能基准)
 - [开发指南](#开发指南)
 - [项目状态](#项目状态)
+
+---
+
+## 为什么做 MetaPool —— 集成设计的由来
+
+### 现实：碎片化的资源管理
+
+在一个典型的 Java 后端项目中，你至少需要管理三类资源：
+
+| 资源类型 | 通常选型 | 配置方式 | 监控方式 |
+|---------|---------|---------|---------|
+| 线程池 | JDK ThreadPoolExecutor | 硬编码 `new` 或 `@Bean` | jstack / 自行埋点 |
+| 数据库连接池 | HikariCP | `spring.datasource.hikari.*` | HikariCP 自有 MBean |
+| Redis 连接池 | Jedis / Lettuce | `JedisPoolConfig` 硬编码 | 无内置监控 |
+| 限流器 | Guava RateLimiter | 硬编码 `RateLimiter.create(n)` | 无内置监控 |
+| 分布式锁 | Redisson | `Config` 对象硬编码 | 无内置监控 |
+| 通用对象池 | Commons Pool2 | `GenericObjectPoolConfig` | 无内置监控 |
+| 内存池 | 自行实现 ByteBuffer 管理 | 无统一方案 | 无内置监控 |
+
+结果：**7 种组件 = 7 套 API + 7 种配置风格 + 7 种监控方式（或没有）**。出问题时得同时查 jstack、Hikari MBean、Redis 连接数、Guava 限流计数——每一层都是独立的孤岛。
+
+### MetaPool 的集成思路
+
+MetaPool 的核心命题是：**能不能用一套抽象，把所有这些资源统一管理起来？**
+
+答案是三层集成架构，自下而上：
+
+```
+业务代码层     @Autowired SmartThreadPoolExecutor pool;
+                  @Autowired DbConnectionPool pool;
+                  @Autowired RedisConnectionPool pool;
+                  @Autowired TokenBucketRateLimiter limiter;
+                  @Autowired SmartReentrantLock lock;
+                      ↑ 全部来自 metapool-spring-starter 自动装配
+                      ↑ 全部遵循 ResourceLifecycle<T> 统一接口
+
+统一配置层     metapool:
+                thread:    core-pool-size: 10  ...
+                db:        max-pool-size: 20   ...
+                redis:     max-pool-size: 20   ...
+                rate-limit: permits-per-second: 1000 ...
+                lock:      default-ttl-seconds: 30 ...
+                object:    lifo: true ...
+                memory:    max-direct-memory-mb: 256 ...
+                      ↑ 一个 YAML 命名空间，全部配置到位
+
+统一可观测层   Agent 字节码拦截 → Micrometer → /actuator/prometheus
+                      ↑                    ↑
+              28 个 Prometheus 指标  ←  Prometheus → Grafana 3 大盘 → AlertManager 6 告警规则
+                      ↑
+              一个端点暴露全部 7 类资源的运行状态
+```
+
+**设计哲学**：
+- **抽象先行**：先定义 `ResourceLifecycle<T>` 接口和 `AbstractResourcePool` 模板方法基类，再让每类资源池去继承，保证行为一致性
+- **零横向依赖**：每个 `pool-*` 模块只依赖 `metapool-common`，互不引用——你只用线程池就不必引入 Redis 客户端
+- **Agent 纵向切面**：Java Agent (`-javaagent`) 是独立进程挂载，不侵入任何业务代码，与核心池化层完全解耦
+- **SPI 向前兼容**：AI 诊断和告警渠道先定义接口，确保后续接入时核心逻辑零改动
+
+---
+
+## 集成架构详解
+
+### 第一层：统一抽象 — `ResourceLifecycle<T>` + `AbstractResourcePool`
+
+所有 7 类资源池实现同一个接口：
+
+```java
+public interface ResourceLifecycle<T> {
+    void    init();                              // 初始化池
+    T       acquire();                           // 获取资源（阻塞）
+    T       acquire(long timeout, TimeUnit unit); // 获取资源（带超时）
+    void    release(T resource);                  // 归还资源
+    void    destroy();                            // 销毁池
+    PoolStats stats();                            // 运行时统计快照
+}
+```
+
+`AbstractResourcePool<T>` 提供 6 个模板方法钩子，子类只需覆写自己关心的部分：
+
+| 钩子方法 | 调用时机 | 默认行为 |
+|---------|---------|---------|
+| `createResource()` | 池需要创建新资源 | 子类必须覆写 |
+| `destroyResource(T)` | 资源被淘汰/销毁 | 子类必须覆写 |
+| `validateResource(T)` | 资源借出前 | 返回 true |
+| `onResourceAcquired(T)` | 资源借出后 | 指标采集 |
+| `onResourceReleased(T)` | 资源归还后 | 指标采集 |
+| `onResourceLeaked(T)` | 检测到泄露 | 告警触发 |
+
+内置能力（所有子类自动继承）：
+- 空闲资源定时回收 (`idleTimeoutSeconds`)
+- 资源借出超时泄露检测 (`leakDetectionThresholdSeconds`)
+- 线程安全的并发 acquire/release
+- 优雅关闭 (`awaitTermination` 等待已借出资源归还)
+
+**这意味着什么？** 实现一个新的资源池类型，只需覆写两个方法（`createResource` + `destroyResource`），就能获得：并发控制、空闲回收、泄露检测、指标采集、配置绑定、健康检查——全部从基类继承，无需重写。
+
+### 第二层：模块隔离 — 零横向依赖
+
+```
+                    metapool-common (零外部依赖)
+                           │
+       ┌───────┬───────┬───┼───┬───────┬───────┐
+       ▼       ▼       ▼   │   ▼       ▼       ▼
+    thread    db    redis   │  object  memory  rate  lock
+       │       │       │    │   │       │       │    │
+       └───────┴───────┴────┼───┴───────┴───────┴────┘
+                            │
+               每个 pool-* 模块只依赖 common
+               模块间零引用，按需单独引入
+```
+
+实际 pom.xml 中的体现：
+
+```xml
+<!-- 只需要线程池 + 限流器？引入这两个即可 -->
+<dependency>
+    <groupId>com.metapool</groupId>
+    <artifactId>metapool-pool-thread</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.metapool</groupId>
+    <artifactId>metapool-pool-rate-limit</artifactId>
+</dependency>
+<!-- 不会被迫引入 Redis 客户端、PG 驱动或其他不相关依赖 -->
+```
+
+### 第三层：Spring Boot Starter — 自动装配与配置绑定
+
+这是集成体验的核心。`metapool-spring-starter` 通过 `@ConditionalOnClass` 实现按需装配：
+
+```java
+// 伪代码示意：Starter 内部逻辑
+@Configuration
+@ConditionalOnClass(SmartThreadPoolExecutor.class)  // classpath 有线程池 → 自动装配
+public class ThreadPoolAutoConfiguration {
+    @Bean
+    @ConfigurationProperties(prefix = "metapool.thread")
+    public ThreadPoolConfig threadPoolConfig() { ... }
+
+    @Bean
+    public SmartThreadPoolExecutor threadPool(ThreadPoolConfig config) { ... }
+}
+
+// 同理：DbPoolAutoConfiguration、RedisPoolAutoConfiguration、
+//       RateLimitAutoConfiguration、LockAutoConfiguration……
+// 你引入哪个模块，哪个就自动生效
+```
+
+接入方视角只有三步：
+
+```yaml
+# 1. application.yml — 一个命名空间配置全部资源
+metapool:
+  thread:
+    core-pool-size: 10
+    max-pool-size: 50
+  db:
+    max-pool-size: 20
+  rate-limit:
+    permits-per-second: 1000
+```
+
+```java
+// 2. 业务代码 — 直接注入，类型安全
+@RestController
+public class OrderController {
+
+    @Autowired
+    private SmartThreadPoolExecutor threadPool;   // 自研线程池
+
+    @Autowired
+    private DbConnectionPool dbPool;               // 自研连接池
+
+    @Autowired
+    private TokenBucketRateLimiter rateLimiter;    // 自研限流器
+
+    @PostMapping("/order")
+    public ApiResult<String> createOrder() {
+        if (!rateLimiter.tryAcquire()) {
+            return ApiResult.fail(ErrorCode.RATE_LIMITED);
+        }
+        threadPool.execute(() -> processOrder());
+        return ApiResult.success("ok");
+    }
+}
+```
+
+```bash
+# 3. 启动中间件（可选，不启用对应模块则不需要）
+docker compose -f deploy/docker-compose.dev.yml up -d
+```
+
+### 第四层：Agent 纵向切面 — 零侵入可观测
+
+这是集成方案中最关键的一层。传统方式下，要监控 7 类资源需要：
+- 线程池 → 自己埋点或引入 Micrometer ThreadPoolTaskExecutor metrics
+- HikariCP → 读 HikariCP 自有 MBean
+- Redis → 读 Lettuce 自有 metrics（如果有的话）
+- 限流器 → 自己埋 Counter
+- 分布式锁 → 自己埋 Timer + Counter
+- ……
+
+MetaPool 的做法：**一个 Agent JAR 解决全部**。
+
+```bash
+# 启动时挂载，零业务代码改动
+java -javaagent:metapool-agent-core.jar=port=9100 -jar your-app.jar
+
+# 全部指标在一个端点
+curl http://localhost:9100/actuator/prometheus
+```
+
+Agent 通过 ByteBuddy 拦截 6 类关键方法，自动采集指标：
+
+| 拦截目标 | 拦截方法 | 自动采集指标数 |
+|---------|---------|:--:|
+| `SmartThreadPoolExecutor` | `execute` / `submit` / `beforeExecute` / `afterExecute` | 6 |
+| `AbstractResourcePool` (DB) | `acquire` / `release` | 6 |
+| `AbstractResourcePool` (Redis) | `acquire` / `release` | 6 |
+| `RateLimiter` | `acquire` | 3 |
+| `Lock` | `tryLock` / `unlock` | 4 |
+| `MemoryPool` | `allocate` / `deallocate` | 3 |
+
+Agent 与业务完全解耦：
+- Agent 是独立 JAR，`-javaagent` 进程级挂载，不修改任何业务代码
+- Agent 拦截范围精确限定 `com.metapool.*`，不扫描全量类
+- 移除 JVM 参数即可卸载，不影响业务系统正常启动
+
+### 第五层：监控闭环 — Prometheus + Grafana + AlertManager
+
+```
+MetaPool App (Agent 挂载)
+    │
+    │  HTTP Pull (每 15s)
+    ▼
+Prometheus Server (指标存储 + 告警规则评估)
+    │                    │
+    ▼                    ▼
+Grafana (3 Dashboard)   AlertManager (6 告警规则)
+    │                    │
+    ▼                    ▼
+线程池 / 连接池 /         PoolExhausted / ResourceLeak
+限流 / 锁 / 内存          ConnectionTimeout / HighQueueDepth
+可视化面板                ThreadPoolRejection / LockHighContention
+```
+
+这一切通过一个 Docker Compose 命令部署：
+
+```bash
+docker compose -f deploy/docker-compose.dev.yml up -d
+# 自动拉起：PostgreSQL 17.4 + Redis 7.2.8 + Prometheus 3.2.0
+#           + AlertManager 0.28.0 + Grafana 11.6.0
+```
+
+### 第六层：SPI 向前兼容 — 预留未来集成点
+
+V1 已经定义好了 AI 诊断和告警渠道的 SPI 接口，后续接入只需：
+
+```
+metapool-spi-ai       →  AiDiagnosisService    (诊断接口)
+                          AiTuningAdvisor        (调优建议接口)
+                          AiChatService          (运维问答接口)
+
+metapool-spi-alert    →  AlertChannel           (告警渠道接口)
+                          支持：钉钉 / 企业微信 / 飞书 / 邮件
+```
+
+实现一个 `AlertChannel` 接口，放入 classpath，`ExtensionLoader` 自动发现并加载——核心池化代码零改动。
+
+### 集成价值总结
+
+| 维度 | 传统方案（碎片化） | MetaPool 集成方案 |
+|------|------------------|-------------------|
+| 配置 | 7 套独立配置，分散在 YAML / 硬编码 / XML | 1 个命名空间 `metapool.*`，全部 YAML |
+| API | 7 套不同 API（`execute()` / `getConnection()` / `acquire()` / `tryAcquire()`…） | 统一 `ResourceLifecycle<T>` 接口 |
+| 监控 | 无统一方案，部分组件无内置监控 | 28 个 Prometheus 指标 + 3 个 Grafana 大盘 |
+| 告警 | 需自行实现 | 6 条开箱即用 Prometheus Alert 规则 |
+| 运维 | 每类资源单独排查 | 全局健康 Dashboard 一眼定位 |
+| 扩展 | 新增资源类型需从零搭建 | 继承 `AbstractResourcePool`，覆写 2 个方法即可 |
+| 依赖 | 7 个独立组件，版本冲突风险 | 统一 BOM 管理，版本锁定 |
 
 ---
 
@@ -36,7 +318,7 @@
                           │   (Spring Boot 3.4 / JDK 17)          │
                           └──────────────────┬───────────────────┘
                                              │ 引入 spring-starter
-                                             │ 零代码侵入
+                                             │ 零代码侵入，自动装配
                                              ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │                        接入层 (Access Layer)                         │
@@ -86,8 +368,8 @@
 |------|------|
 | **Agent 独立进程挂载** | `-javaagent` 零业务代码侵入，与核心池化层解耦 |
 | **模块间零横向依赖** | 7 类资源池平铺，业务方按需引用，不强制全量引入 |
-| **common 零外部依赖** | smartpool-common 不含 Lombok/Slf4j，不污染下游 |
-| **V1 仅 SPI 接口** | AI 诊断 & 告警渠道仅定义契约，不挤占 30 天工期 |
+| **common 零外部依赖** | metapool-common 不含 Lombok/Slf4j，不污染下游 |
+| **V1 仅 SPI 接口** | AI 诊断 & 告警渠道仅定义契约，保证向前兼容 |
 
 ---
 
@@ -95,18 +377,18 @@
 
 | 模块 | Spec | 说明 | 测试 |
 |------|:--:|------|:--:|
-| `smartpool-common` | 01~05 | 生命周期接口、抽象基类、SPI、异常体系、枚举 | 26 |
-| `smartpool-pool-thread` | 06 | 自研线程池（3 种拒绝策略、队列可观测、动态调参） | 17 |
-| `smartpool-pool-db` | 07 | PostgreSQL 连接池（连接验证、泄露检测、慢连接剔除） | 14 |
-| `smartpool-pool-redis` | 08 | Redis 连接池（PING 验证、密码认证、自动恢复） | 12 |
-| `smartpool-pool-object` | 09 | 通用对象池（FIFO/LIFO、泛型工厂、驱逐策略） | 17 |
-| `smartpool-pool-memory` | 10 | 内存资源池（堆内分页、堆外预留、硬限制） | 26 |
-| `smartpool-pool-rate-limit` | 11 | 令牌桶限流器（预热机制、动态调参） | 10 |
-| `smartpool-pool-lock` | 12 | 分布式锁（可重入、自动续期、Redis 故障降级） | 29 |
-| `smartpool-agent-core` | 13~14 | ByteBuddy 字节码拦截 + Prometheus 指标暴露 | 51 |
-| `smartpool-spring-starter` | 16 | Spring Boot 自动装配（HealthIndicator、Actuator、全局异常处理） | 22 |
-| `smartpool-spi-ai` | 17 | AI 诊断 SPI 接口（V1 仅接口定义） | 28 |
-| `smartpool-spi-alert` | 18 | 告警渠道 SPI 接口（V1 仅接口定义） | 9 |
+| `metapool-common` | 01~05 | 生命周期接口、抽象基类、SPI、异常体系、枚举 | 26 |
+| `metapool-pool-thread` | 06 | 自研线程池（3 种拒绝策略、队列可观测、动态调参） | 17 |
+| `metapool-pool-db` | 07 | PostgreSQL 连接池（连接验证、泄露检测、慢连接剔除） | 14 |
+| `metapool-pool-redis` | 08 | Redis 连接池（PING 验证、密码认证、自动恢复） | 12 |
+| `metapool-pool-object` | 09 | 通用对象池（FIFO/LIFO、泛型工厂、驱逐策略） | 17 |
+| `metapool-pool-memory` | 10 | 内存资源池（堆内分页、堆外预留、硬限制） | 26 |
+| `metapool-pool-rate-limit` | 11 | 令牌桶限流器（预热机制、动态调参） | 10 |
+| `metapool-pool-lock` | 12 | 分布式锁（可重入、自动续期、Redis 故障降级） | 29 |
+| `metapool-agent-core` | 13~14 | ByteBuddy 字节码拦截 + Prometheus 指标暴露 | 51 |
+| `metapool-spring-starter` | 16 | Spring Boot 自动装配（HealthIndicator、Actuator、全局异常处理） | 22 |
+| `metapool-spi-ai` | 17 | AI 诊断 SPI 接口（V1 仅接口定义） | 28 |
+| `metapool-spi-alert` | 18 | 告警渠道 SPI 接口（V1 仅接口定义） | 9 |
 | `deploy/` | 15/19/20 | Docker Compose ×2 + Grafana ×3 + Prometheus 告警规则 ×6 | — |
 
 ---
@@ -122,8 +404,8 @@
 ### 1. 构建项目
 
 ```bash
-git clone <repo-url> smartpool
-cd smartpool
+git clone <repo-url> metapool
+cd metapool
 
 # 设置 JDK 17
 export JAVA_HOME="/path/to/jdk-17"
@@ -144,27 +426,28 @@ curl http://localhost:9090/-/healthy   # Prometheus
 curl http://localhost:3000/api/health  # Grafana
 ```
 
-### 3. 使用 SmartPool
+### 3. 使用 MetaPool
 
 #### 方式一：Spring Boot Starter（推荐）
 
 ```xml
-<!-- pom.xml -->
+<!-- pom.xml — 按需引入，引入哪个装配哪个 -->
 <dependency>
-    <groupId>com.smartpool</groupId>
-    <artifactId>smartpool-spring-starter</artifactId>
+    <groupId>com.metapool</groupId>
+    <artifactId>metapool-spring-starter</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
-    <groupId>com.smartpool</groupId>
-    <artifactId>smartpool-pool-thread</artifactId>
+    <groupId>com.metapool</groupId>
+    <artifactId>metapool-pool-thread</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
+<!-- 其他池模块按需添加：pool-db / pool-redis / pool-rate-limit / pool-lock / ... -->
 ```
 
 ```yaml
-# application.yml — 按需配置即可
-smartpool:
+# application.yml — 一个命名空间配置全部
+metapool:
   thread:
     core-pool-size: 10
     max-pool-size: 50
@@ -187,7 +470,7 @@ public class TaskController {
 }
 ```
 
-#### 方式二：直接使用池模块
+#### 方式二：直接使用池模块（不依赖 Spring）
 
 ```java
 // 自研线程池 — 独立使用
@@ -197,7 +480,7 @@ config.setMaxPoolSize(50);
 
 SmartThreadPoolExecutor pool = new SmartThreadPoolExecutor(config);
 
-pool.execute(() -> System.out.println("Hello SmartPool!"));
+pool.execute(() -> System.out.println("Hello MetaPool!"));
 pool.stats();  // PoolStats{activeCount=1, ...}
 pool.shutdown();
 ```
@@ -205,10 +488,10 @@ pool.shutdown();
 #### 方式三：Java Agent（可观测）
 
 ```bash
-# 挂载 Agent，自动采集指标
-java -javaagent:smartpool-agent-core.jar=port=9100 -jar your-app.jar
+# 挂载 Agent，自动采集全部 7 类资源池指标
+java -javaagent:metapool-agent-core.jar=port=9100 -jar your-app.jar
 
-# 查看指标
+# 查看全部指标
 curl http://localhost:9100/actuator/prometheus
 ```
 
@@ -216,10 +499,10 @@ curl http://localhost:9100/actuator/prometheus
 
 ## 配置参考
 
-完整配置参见 `smartpool-spring-starter/src/main/resources/application-smartpool.yml`。
+完整配置参见 `metapool-spring-starter/src/main/resources/application-metapool.yml`。
 
 ```yaml
-smartpool:
+metapool:
   # ── 线程池 ──
   thread:
     core-pool-size: 10
@@ -227,7 +510,7 @@ smartpool:
     keep-alive-seconds: 60
     queue-capacity: 1000
     rejected-policy: CALLER_RUNS          # ABORT | CALLER_RUNS | DISCARD
-    thread-name-prefix: smartpool-worker-
+    thread-name-prefix: metapool-worker-
 
   # ── 数据库连接池 ──
   db:
@@ -278,19 +561,19 @@ smartpool:
 
 | 资源池 | 指标数 | 前缀 | 示例 |
 |--------|:---:|------|------|
-| 线程池 | 6 | `smartpool_thread_*` | `_active_count`, `_pool_size`, `_queue_size`, `_completed_total`, `_rejected_total`, `_queue_wait_seconds` |
-| 数据库连接池 | 6 | `smartpool_db_*` | `_active_connections`, `_idle_connections`, `_pending_requests`, `_connection_timeout_total`, `_connection_leak_total`, `_acquire_wait_seconds` |
-| Redis 连接池 | 6 | `smartpool_redis_*` | 同上结构 |
-| 限流器 | 3 | `smartpool_rate_*` | `_pass_total`, `_reject_total`, `_available_permits` |
-| 分布式锁 | 4 | `smartpool_lock_*` | `_acquire_total`, `_timeout_total`, `_hold_seconds`, `_contention_count` |
-| 内存池 | 3 | `smartpool_memory_*` | `_used_bytes`, `_max_bytes`, `_allocation_total` |
+| 线程池 | 6 | `metapool_thread_*` | `_active_count`, `_pool_size`, `_queue_size`, `_completed_total`, `_rejected_total`, `_queue_wait_seconds` |
+| 数据库连接池 | 6 | `metapool_db_*` | `_active_connections`, `_idle_connections`, `_pending_requests`, `_connection_timeout_total`, `_connection_leak_total`, `_acquire_wait_seconds` |
+| Redis 连接池 | 6 | `metapool_redis_*` | 同上结构 |
+| 限流器 | 3 | `metapool_rate_*` | `_pass_total`, `_reject_total`, `_available_permits` |
+| 分布式锁 | 4 | `metapool_lock_*` | `_acquire_total`, `_timeout_total`, `_hold_seconds`, `_contention_count` |
+| 内存池 | 3 | `metapool_memory_*` | `_used_bytes`, `_max_bytes`, `_allocation_total` |
 
 ### Grafana Dashboard
 
 | Dashboard | 面板数 | 访问方式 |
 |-----------|:---:|------|
-| **线程池监控** | 8 面板 | Grafana → Dashboards → SmartPool — 线程池监控 |
-| **连接池监控** | 8 面板 | Grafana → Dashboards → SmartPool — 连接池监控 |
+| **线程池监控** | 8 面板 | Grafana → Dashboards → MetaPool — 线程池监控 |
+| **连接池监控** | 8 面板 | Grafana → Dashboards → MetaPool — 连接池监控 |
 | **全局健康总览** | 16 面板 | Grafana 默认首页，全池概览 + 告警汇总 |
 
 ```bash
@@ -312,108 +595,25 @@ open http://localhost:3000
 
 ---
 
-## 性能基准
-
-> JMH 1.37 · JDK 17 · 3 warmup + 5 measurement iterations · Mode: Throughput (ops/s)
-
-### 线程池 — SmartThreadPoolExecutor vs JDK ThreadPoolExecutor
-
-| Benchmark | SmartPool (ops/s) | JDK (ops/s) | SmartPool/JDK |
-|-----------|------------------:|------------:|:--:|
-| 单线程 execute | 47,765,739 | 99,527,889 | 48% |
-| 4 线程 execute | 30,792,174 | 59,704,503 | **52%** |
-
-> 双检锁优化消除热路径锁竞争，单线程场景下吞吐量达 JDK 的 48%。4 线程竞争场景下 SmartPool 保持稳定的线性扩展。
-
-### 对象池 — GenericObjectPool
-
-| Benchmark | Throughput (ops/s) |
-|-----------|-------------------:|
-| FIFO 单线程 | 12,432,499 |
-| FIFO 4 线程 | 9,056,830 |
-| LIFO 单线程 | 11,613,901 |
-| LIFO 4 线程 | 7,800,524 |
-
-> FIFO 比 LIFO 快 ~7%；4 线程竞争下吞吐量约为单线程的 68%。
-
-### 限流器 — TokenBucketRateLimiter
-
-| Benchmark | Throughput (ops/s) |
-|-----------|-------------------:|
-| 不限流 单线程 | 26,629,764 |
-| 不限流 4 线程 | 13,119,638 |
-| 1 万 QPS 单线程 | 26,708,279 |
-| 1 万 QPS 4 线程 | 12,998,543 |
-
-> 高/低 QPS 配置下吞吐量差异极小（< 0.5%），synchronized 竞争为主要瓶颈，4 线程时吞吐量约为单线程的 49%。
-
-### 内存池 — MemoryPool
-
-| Benchmark | Throughput (ops/s) |
-|-----------|-------------------:|
-| alloc/dealloc 单线程 | 16,354,306 |
-| alloc/dealloc 4 线程 | 10,090,605 |
-
-> 单线程 ~16.4M ops/s，4 线程竞争下保持 ~10.1M ops/s，内存页借还路径健康。
-
-### DB/Redis 连接池 — 高并发压力测试
-
-| 模块 | 测试条件 | 结果 |
-|------|---------|:--:|
-| DB Pool | 50 线程 × 200 次借还 | ✅ 无死锁、无泄露 |
-| Redis Pool | 50 线程 × 200 次借还 | ✅ 无死锁、无泄露 |
-
-### 运行基准测试
-
-```bash
-# 设置 JDK 17
-export JAVA_HOME="/path/to/jdk-17"
-
-# 方式一：运行全部 4 个基准（逐个执行）
-mvn test-compile -DskipTests
-
-# 线程池基准
-mvn -pl smartpool-pool-thread -am test-compile exec:java \
-  -Dexec.mainClass="com.smartpool.pool.thread.ThreadPoolBenchmark" \
-  -Dexec.classpathScope=test
-
-# 对象池基准
-mvn -pl smartpool-pool-object -am test-compile exec:java \
-  -Dexec.mainClass="com.smartpool.pool.object.ObjectPoolBenchmark" \
-  -Dexec.classpathScope=test
-
-# 限流器基准
-mvn -pl smartpool-pool-rate-limit -am test-compile exec:java \
-  -Dexec.mainClass="com.smartpool.pool.rate.limit.RateLimiterBenchmark" \
-  -Dexec.classpathScope=test
-
-# 内存池基准
-mvn -pl smartpool-pool-memory -am test-compile exec:java \
-  -Dexec.mainClass="com.smartpool.pool.memory.MemoryPoolBenchmark" \
-  -Dexec.classpathScope=test
-```
-
----
-
 ## 开发指南
 
 ### 工程结构
 
 ```
-smartpool/
+metapool/
 ├── pom.xml                          # 根 POM（dependencyManagement）
-├── smartpool-common/                # 基础设施层（零外部依赖）
-├── smartpool-pool-thread/           # 线程池
-├── smartpool-pool-db/               # 数据库连接池
-├── smartpool-pool-redis/            # Redis 连接池
-├── smartpool-pool-object/           # 通用对象池
-├── smartpool-pool-memory/           # 内存资源池
-├── smartpool-pool-rate-limit/       # 限流器
-├── smartpool-pool-lock/             # 分布式锁
-├── smartpool-agent-core/            # Java Agent（独立 JAR）
-├── smartpool-spring-starter/        # Spring Boot Starter
-├── smartpool-spi-ai/                # AI 诊断 SPI（V1 仅接口）
-├── smartpool-spi-alert/             # 告警渠道 SPI（V1 仅接口）
+├── metapool-common/                # 基础设施层（零外部依赖）
+├── metapool-pool-thread/           # 线程池
+├── metapool-pool-db/               # 数据库连接池
+├── metapool-pool-redis/            # Redis 连接池
+├── metapool-pool-object/           # 通用对象池
+├── metapool-pool-memory/           # 内存资源池
+├── metapool-pool-rate-limit/       # 限流器
+├── metapool-pool-lock/             # 分布式锁
+├── metapool-agent-core/            # Java Agent（独立 JAR）
+├── metapool-spring-starter/        # Spring Boot Starter
+├── metapool-spi-ai/                # AI 诊断 SPI（V1 仅接口）
+├── metapool-spi-alert/             # 告警渠道 SPI（V1 仅接口）
 ├── deploy/                          # Docker Compose + 监控配置
 │   ├── docker-compose.dev.yml
 │   ├── docker-compose.prod.yml
@@ -428,26 +628,13 @@ smartpool/
 
 项目遵循 **Alibaba Java Guide**，额外规范：
 
-- **包命名**：`com.smartpool.{module}`
+- **包命名**：`com.metapool.{module}`
 - **common 零外部依赖**：不含 Lombok/Slf4j
 - **异常码格式**：`{域}-{三位数字}`，如 `POOL-001`
 - **资源池状态守卫**：必须覆盖 NEW/INITIALIZING 等初始化前状态
 - **AutoConfiguration 禁止 @ComponentScan**：避免无条件扫描导致上下文初始化失败
 
 详见：[项目 Rules 规范文档](../项目%20Rules%20规范文档.md)（18 条规则）
-
-### 开发流程
-
-```bash
-# 1. 阅读 Rules + Spec + 编码规范
-# 2. 编码实现
-
-# 3. 全量测试
-export JAVA_HOME="/path/to/jdk-17"
-mvn test
-
-# 4. 更新文档（Spec 状态 + Rules + CONTEXT_SUMMARY）
-```
 
 ### 技术栈
 
@@ -485,4 +672,4 @@ mvn test
 
 ---
 
-*Made with ❤️ by SmartPool Team · 2026*
+*Made with ❤️ by [roseri66](https://github.com/roseri66) · 2026*

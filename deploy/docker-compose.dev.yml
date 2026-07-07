@@ -1,5 +1,5 @@
 # ============================================================
-# SmartPool — 开发环境 Docker Compose
+# MetaPool — 开发环境 Docker Compose
 # 用途：本地开发时一键启动全部中间件，Java 应用由 IDEA 直接启动
 # 启动：docker compose -f docker-compose.dev.yml up -d
 # 停止：docker compose -f docker-compose.dev.yml down
@@ -13,30 +13,30 @@ services:
   # ─────────────────────────────────────────────────────────
   postgres:
     image: postgres:17.4-alpine
-    container_name: smartpool-pg-dev
+    container_name: metapool-pg-dev
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smartpool}
-      POSTGRES_USER: ${POSTGRES_USER:-smartpool}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartpool_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-metapool}
+      POSTGRES_USER: ${POSTGRES_USER:-metapool}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metapool_dev}
     ports:
       - "5432:5432"
     volumes:
       - pgdata-dev:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartpool} -d ${POSTGRES_DB:-smartpool}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-metapool} -d ${POSTGRES_DB:-metapool}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - smartpool-net
+      - metapool-net
 
   # ─────────────────────────────────────────────────────────
   # Redis 7.2.8 — 分布式锁 + Redis 连接池验证目标
   # ─────────────────────────────────────────────────────────
   redis:
     image: redis:7.2.8-alpine
-    container_name: smartpool-redis-dev
+    container_name: metapool-redis-dev
     restart: unless-stopped
     command: >
       redis-server
@@ -52,14 +52,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - smartpool-net
+      - metapool-net
 
   # ─────────────────────────────────────────────────────────
   # Prometheus 3.2.0 — 指标拉取 + 告警规则评估
   # ─────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v3.2.0
-    container_name: smartpool-prom-dev
+    container_name: metapool-prom-dev
     restart: unless-stopped
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -73,14 +73,14 @@ services:
       - ./prometheus/prometheus-alert-rules.yml:/etc/prometheus/prometheus-alert-rules.yml:ro
       - promdata-dev:/prometheus
     networks:
-      - smartpool-net
+      - metapool-net
 
   # ─────────────────────────────────────────────────────────
   # AlertManager 0.28.0 — 告警聚合/去重/路由
   # ─────────────────────────────────────────────────────────
   alertmanager:
     image: prom/alertmanager:v0.28.0
-    container_name: smartpool-alert-dev
+    container_name: metapool-alert-dev
     restart: unless-stopped
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
@@ -91,14 +91,14 @@ services:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertdata-dev:/alertmanager
     networks:
-      - smartpool-net
+      - metapool-net
 
   # ─────────────────────────────────────────────────────────
   # Grafana 11.6.0 — 仪表板可视化
   # ─────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:11.6.0
-    container_name: smartpool-grafana-dev
+    container_name: metapool-grafana-dev
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
@@ -113,7 +113,7 @@ services:
       - ./grafana/dashboards/global-health.json:/etc/grafana/dashboards/global-health.json:ro
       - grafanadata-dev:/var/lib/grafana
     networks:
-      - smartpool-net
+      - metapool-net
 
 volumes:
   pgdata-dev:
@@ -123,6 +123,6 @@ volumes:
   grafanadata-dev:
 
 networks:
-  smartpool-net:
-    name: smartpool-net
+  metapool-net:
+    name: metapool-net
     driver: bridge

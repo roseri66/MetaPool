@@ -4,27 +4,27 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.smartpool</groupId>
-    <artifactId>smartpool-parent</artifactId>
+    <groupId>com.metapool</groupId>
+    <artifactId>metapool-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>SmartPool Parent</name>
+    <name>MetaPool Parent</name>
     <description>智能多资源池统一管理系统 — 根 POM</description>
 
     <modules>
-        <module>smartpool-common</module>
-        <module>smartpool-pool-thread</module>
-        <module>smartpool-pool-db</module>
-        <module>smartpool-pool-redis</module>
-        <module>smartpool-pool-rate-limit</module>
-        <module>smartpool-pool-lock</module>
-        <module>smartpool-pool-object</module>
-        <module>smartpool-pool-memory</module>
-        <module>smartpool-spi-ai</module>
-        <module>smartpool-spi-alert</module>
-        <module>smartpool-agent-core</module>
-        <module>smartpool-spring-starter</module>
+        <module>metapool-common</module>
+        <module>metapool-pool-thread</module>
+        <module>metapool-pool-db</module>
+        <module>metapool-pool-redis</module>
+        <module>metapool-pool-rate-limit</module>
+        <module>metapool-pool-lock</module>
+        <module>metapool-pool-object</module>
+        <module>metapool-pool-memory</module>
+        <module>metapool-spi-ai</module>
+        <module>metapool-spi-alert</module>
+        <module>metapool-agent-core</module>
+        <module>metapool-spring-starter</module>
     </modules>
 
     <properties>

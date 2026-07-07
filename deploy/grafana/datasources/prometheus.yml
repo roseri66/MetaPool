@@ -1,11 +1,11 @@
 # ============================================================
-# SmartPool — Grafana Prometheus 数据源配置
+# MetaPool — Grafana Prometheus 数据源配置
 # 自动 provisioning，Grafana 启动时加载
 # ============================================================
 apiVersion: 1
 
 datasources:
-  - name: "Prometheus-SmartPool"
+  - name: "Prometheus-MetaPool"
     type: prometheus
     access: proxy
     url: http://prometheus:9090
