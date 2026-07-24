@@ -15,10 +15,11 @@
     <modules>
         <module>metapool-common</module>
         <module>metapool-adapter-hikari</module>
+        <module>metapool-adapter-bucket4j</module>
         <!--
             2.0 迁移中：以下模块仍是 1.0 自研池实现，依赖已删除的旧契约，暂移出 reactor 保持构建绿。
             源码保留在磁盘 / git 历史供改造参考，随对应 Milestone 逐个重建为「治理适配器」后再加回：
-              M3  metapool-pool-rate-limit→ metapool-adapter-bucket4j (包 Bucket4j)
+              M3  metapool-core            (DefaultResourceManager 控制面实现)
               M3  metapool-spring-starter  (改造为控制面自动装配)
               扩展 metapool-pool-redis/object/thread/lock/memory (Lettuce/Commons-Pool2/JDK/Redisson/Netty)
         -->
@@ -34,6 +35,7 @@
         <!-- 框架版本锁定 -->
         <spring-boot.version>3.4.3</spring-boot.version>
         <micrometer.version>1.14.5</micrometer.version>
+        <bucket4j.version>8.9.0</bucket4j.version>
         <lettuce.version>6.3.2.RELEASE</lettuce.version>
         <postgresql-driver.version>42.7.5</postgresql-driver.version>
         <testcontainers.version>1.20.6</testcontainers.version>
@@ -72,6 +74,13 @@
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-registry-prometheus</artifactId>
                 <version>${micrometer.version}</version>
+            </dependency>
+
+            <!-- Bucket4j：metapool-adapter-bucket4j 的编译期依赖 -->
+            <dependency>
+                <groupId>com.bucket4j</groupId>
+                <artifactId>bucket4j-core</artifactId>
+                <version>${bucket4j.version}</version>
             </dependency>
 
             <!-- Lettuce -->
