@@ -21,9 +21,6 @@
         <module>metapool-pool-lock</module>
         <module>metapool-pool-object</module>
         <module>metapool-pool-memory</module>
-        <module>metapool-spi-ai</module>
-        <module>metapool-spi-alert</module>
-        <module>metapool-agent-core</module>
         <module>metapool-spring-starter</module>
     </modules>
 
@@ -36,7 +33,6 @@
 
         <!-- 框架版本锁定 -->
         <spring-boot.version>3.4.3</spring-boot.version>
-        <byte-buddy.version>1.15.10</byte-buddy.version>
         <micrometer.version>1.14.5</micrometer.version>
         <lettuce.version>6.3.2.RELEASE</lettuce.version>
         <postgresql-driver.version>42.7.5</postgresql-driver.version>
@@ -69,13 +65,6 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <!-- ByteBuddy -->
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy</artifactId>
-                <version>${byte-buddy.version}</version>
             </dependency>
 
             <!-- Micrometer -->
