@@ -4,7 +4,7 @@
 > 开发方式：按真实开源项目流程分 Milestone 推进，**每个 Milestone 完成并验收后再进下一个**。
 > 纪律：任何实现代码开工前，接口签名先经设计确认（工作原则 5）。
 
-**进度：M0 ✅ · M1 ✅ · M2 ✅ · M3 ✅ · M4 🚧**
+**进度：M0 ✅ · M1 ✅ · M2 ✅ · M3 ✅ · M4 ✅（README/examples/JMH benchmark/Testcontainers PG 均完成）**
 （M3 实施中新增 `metapool-core` 模块承载控制面实现，使 `metapool-common` 保持纯契约——此决策已并入下方 M3。）
 
 ---

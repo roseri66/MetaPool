@@ -181,7 +181,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M1 | 核心契约（治理 + 能力隔离） | ✅ |
 | M2 | HikariCP 适配器 | ✅ |
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
-| M4 | 文档 / examples / JMH benchmark / Testcontainers | 🚧 |
+| M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 扩展 | redis / object / executor / lock / memory 适配器 | 📋 |
 | 发布 | BOM + `io.github.*` groupId + Maven Central | 📋 |
 
