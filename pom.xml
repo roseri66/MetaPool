@@ -14,10 +14,10 @@
 
     <modules>
         <module>metapool-common</module>
+        <module>metapool-adapter-hikari</module>
         <!--
             2.0 迁移中：以下模块仍是 1.0 自研池实现，依赖已删除的旧契约，暂移出 reactor 保持构建绿。
             源码保留在磁盘 / git 历史供改造参考，随对应 Milestone 逐个重建为「治理适配器」后再加回：
-              M2  metapool-pool-db        → metapool-adapter-hikari   (包 HikariCP)
               M3  metapool-pool-rate-limit→ metapool-adapter-bucket4j (包 Bucket4j)
               M3  metapool-spring-starter  (改造为控制面自动装配)
               扩展 metapool-pool-redis/object/thread/lock/memory (Lettuce/Commons-Pool2/JDK/Redisson/Netty)
@@ -148,12 +148,11 @@
                 <version>${redisson.version}</version>
                 <scope>test</scope>
             </dependency>
-            <!-- SPEC-V11-08: HikariCP -->
+            <!-- HikariCP：2.0 起作为 metapool-adapter-hikari 的编译期依赖（原 V1.1 仅用于对比基准） -->
             <dependency>
                 <groupId>com.zaxxer</groupId>
                 <artifactId>HikariCP</artifactId>
                 <version>${hikaricp.version}</version>
-                <scope>test</scope>
             </dependency>
             <!-- SPEC-V11-08/11: H2 for fair DB comparison -->
             <dependency>
