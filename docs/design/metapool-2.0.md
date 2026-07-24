@@ -115,28 +115,31 @@ metaPool.close();               // 统一优雅停机（逆序 drain）
                      │       ManagedResource        │  ← 治理身份（所有资源必实现）
                      │   name() type()              │
    统一治理契约 ────▶│   + ManagedLifecycle         │  ← 统一：start/stop/health/drain
-   （同构）          │   + MetricsSource            │  ← 统一：吐指标（头牌亮点）
-                     │   + Tunable                  │  ← 统一：热调参（头牌亮点）
+   （同构，普适）    │   + MetricsSource            │  ← 统一：吐指标（头牌亮点）
                      └──────────────┬──────────────┘
-                                    │ 各资源"额外"实现自己的能力接口（不统一）
-        ┌───────────────┬──────────┴─────────┬──────────────────┐
-        ▼               ▼                     ▼                  ▼
-   Pool<T>         RateLimiter            DistributedLock     ManagedExecutor
-  borrow/return   tryAcquire()           lock()/unlock()     execute()/submit()
-  (db/redis/obj)  (rate-limit)           (lock)              (thread)
+                                    │ 各资源"额外"实现自己的可选能力接口（谁有谁实现，manager 用 instanceof 探测）
+        ┌───────────────┬──────────┬┴────────┬──────────────────┐
+        ▼               ▼          ▼          ▼                  ▼
+   Tunable         Pool<T>    RateLimiter  DistributedLock   ManagedExecutor
+  apply(patch)    borrow/rel  tryAcquire   lock()/unlock()   execute()/submit()
+  (热调参/头牌)   (db/redis)  (rate-limit) (lock, 待定义)    (thread, 待定义)
         │
-   ┌────▼────────────────────────────────┐
-   │  ResourceAdapter  (SPI 扩展点)       │  ← 把任意成熟库纳入治理
-   │  HikariAdapter / Bucket4jAdapter ... │
-   └──────────────────────────────────────┘
+   ┌────▼────────────────────────────────────────┐
+   │  ResourceAdapterFactory  (SPI 扩展点)         │  ← 把任意成熟库纳入治理
+   │  HikariAdapterFactory / Bucket4jAdapterFactory │
+   └────────────────────────────────────────────────┘
 ```
+
+> **注（决策②，M1 落地）**：`Tunable` 是<b>可选能力接口</b>，与 `Pool`/`RateLimiter` 并列，而非
+> `ManagedResource` 的必实现部分——不是每个资源都有可调参数。控制面通过 `instanceof Tunable` 探测后启用。
 
 每个抽象都回答：**为什么需要它？不用它有什么问题？**
 
 ### 3.1 `ManagedResource` — 治理身份
 
-- **是什么**：所有被纳管资源的公共根。只承载治理身份：`name()`（全局唯一）、`type()`。
-  组合下面三个治理能力，**不含任何 acquire/release**。
+- **是什么**：所有被纳管资源的公共根。只承载治理身份：`name()`（全局唯一）、`type()`，
+  并组合两个**普适**治理能力 `ManagedLifecycle` + `MetricsSource`，**不含任何 acquire/release**。
+  （`Tunable` 按决策②下沉为可选能力，见上图注。）
 - **为什么需要**：控制面要能把异构资源当同一种东西去枚举、监控、停机。
 - **不用会怎样**：回到 1.0 的碎片化——每种资源一套监控/停机代码，正是 BRD 要消灭的痛点。
 
