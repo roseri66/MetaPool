@@ -1,17 +1,19 @@
 package com.metapool.common.exception;
 
 /**
- * 资源耗尽异常 — 池中无可用资源且等待队列已满或超时。
+ * 池类资源耗尽异常 — 无可用资源且已达上限（borrow 超时时抛出）。
  *
- * @since 0.1.0
+ * <p>仅由实现 {@link com.metapool.common.capability.Pool} 能力的资源抛出。
+ *
+ * @since 2.0.0
  */
 public class PoolExhaustedException extends MetaPoolException {
 
     public PoolExhaustedException(String message) {
-        super("POOL-001", message);
+        super(ErrorCode.POOL_EXHAUSTED, message);
     }
 
     public PoolExhaustedException(String message, Throwable cause) {
-        super("POOL-001", message, cause);
+        super(ErrorCode.POOL_EXHAUSTED, message, cause);
     }
 }
