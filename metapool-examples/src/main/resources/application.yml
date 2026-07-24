@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+metapool:
+  datasources:
+    main:
+      jdbc-url: jdbc:h2:mem:demo;DB_CLOSE_DELAY=-1
+      username: sa
+      password: ""
+      maximum-pool-size: 10
+      tunable: [maximum-pool-size, connection-timeout]
+  rate-limiters:
+    order-api:
+      limit-for-period: 5          # demo：每秒 5 个，便于观察限流
+      refill-period: 1s
+      tunable: [limit-for-period]
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metapool
+  endpoint:
+    health:
+      show-details: always

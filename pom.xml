@@ -18,6 +18,7 @@
         <module>metapool-adapter-hikari</module>
         <module>metapool-adapter-bucket4j</module>
         <module>metapool-spring-starter</module>
+        <module>metapool-examples</module>
         <!--
             2.0 迁移中：以下 1.0 自研池模块依赖已删除的旧契约，暂移出 reactor 保持构建绿。
             源码保留在磁盘 / git 历史供改造参考，扩展阶段逐个重建为「治理适配器」后再加回：
@@ -183,6 +184,8 @@
                     <configuration>
                         <release>${maven.compiler.release}</release>
                         <encoding>${project.build.sourceEncoding}</encoding>
+                        <!-- 保留方法参数名：Spring Actuator @WriteOperation 参数绑定依赖它 -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>
