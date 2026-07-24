@@ -17,11 +17,11 @@
         <module>metapool-core</module>
         <module>metapool-adapter-hikari</module>
         <module>metapool-adapter-bucket4j</module>
+        <module>metapool-spring-starter</module>
         <!--
-            2.0 迁移中：以下模块仍是 1.0 自研池实现，依赖已删除的旧契约，暂移出 reactor 保持构建绿。
-            源码保留在磁盘 / git 历史供改造参考，随对应 Milestone 逐个重建为「治理适配器」后再加回：
-              M3  metapool-spring-starter  (改造为控制面自动装配)
-              扩展 metapool-pool-redis/object/thread/lock/memory (Lettuce/Commons-Pool2/JDK/Redisson/Netty)
+            2.0 迁移中：以下 1.0 自研池模块依赖已删除的旧契约，暂移出 reactor 保持构建绿。
+            源码保留在磁盘 / git 历史供改造参考，扩展阶段逐个重建为「治理适配器」后再加回：
+              metapool-pool-redis/object/thread/lock/memory (Lettuce/Commons-Pool2/JDK/Redisson/Netty)
         -->
     </modules>
 

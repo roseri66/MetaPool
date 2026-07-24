@@ -14,56 +14,26 @@
     <packaging>jar</packaging>
 
     <name>MetaPool Spring Boot Starter</name>
-    <description>Spring Boot Starter 接入层 — 按需自动装配、配置绑定、健康检查、Actuator 端点、全局异常处理</description>
+    <description>Spring Boot 接入层 — YAML 声明式纳管、控制面自动装配、指标绑定、health/tune Actuator 端点</description>
 
     <dependencies>
-        <!-- metapool-common（必选） -->
+        <!-- 控制面（含 common） -->
         <dependency>
             <groupId>com.metapool</groupId>
-            <artifactId>metapool-common</artifactId>
+            <artifactId>metapool-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
-        <!-- 池模块（可选：按需引入） -->
+        <!-- 适配器：可选，用户按需引入所用资源类型的 adapter jar（SPI 自动发现） -->
         <dependency>
             <groupId>com.metapool</groupId>
-            <artifactId>metapool-pool-thread</artifactId>
+            <artifactId>metapool-adapter-hikari</artifactId>
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.metapool</groupId>
-            <artifactId>metapool-pool-db</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.metapool</groupId>
-            <artifactId>metapool-pool-redis</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.metapool</groupId>
-            <artifactId>metapool-pool-object</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.metapool</groupId>
-            <artifactId>metapool-pool-memory</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.metapool</groupId>
-            <artifactId>metapool-pool-rate-limit</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.metapool</groupId>
-            <artifactId>metapool-pool-lock</artifactId>
+            <artifactId>metapool-adapter-bucket4j</artifactId>
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
@@ -80,24 +50,32 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- 测试 -->
+        <!-- 测试：引入两个适配器 + H2，验证 SPI 自动发现与全链路装配 -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <groupId>com.metapool</groupId>
+            <artifactId>metapool-adapter-hikari</artifactId>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>com.metapool</groupId>
+            <artifactId>metapool-adapter-bucket4j</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- micrometer-core 由 metapool-core→common 以 compile 传递而来（SimpleMeterRegistry 测试可见） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

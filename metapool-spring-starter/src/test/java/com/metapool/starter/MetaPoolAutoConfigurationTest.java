@@ -1,169 +1,68 @@
 package com.metapool.starter;
 
-import com.metapool.pool.memory.MemoryPool;
-import com.metapool.pool.memory.MemoryPoolConfig;
-import com.metapool.pool.rate.limit.RateLimiterConfig;
-import com.metapool.pool.rate.limit.TokenBucketRateLimiter;
-import com.metapool.pool.thread.ThreadPoolConfig;
-import com.metapool.pool.thread.ThreadResourcePool;
-import com.metapool.starter.config.MemoryPoolAutoConfiguration;
-import com.metapool.starter.config.RateLimitAutoConfiguration;
-import com.metapool.starter.config.ThreadPoolAutoConfiguration;
-
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
+import com.metapool.common.manager.ResourceManager;
+import com.metapool.common.stats.HealthStatus;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * SPEC-16 自动装配条件测试。
- *
- * @since 0.1.0
+ * M3-B2 验收：YAML 声明式接入 → 控制面自动装配 → SPI 发现 hikari+bucket4j → 全链路。
  */
-@DisplayName("SPEC-16 自动装配条件测试")
 class MetaPoolAutoConfigurationTest {
 
-    // ==================== 线程池自动装配 ====================
+    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(MetaPoolAutoConfiguration.class))
+            .withUserConfiguration(MeterRegistryConfig.class)
+            .withPropertyValues(
+                    "metapool.datasources.main.jdbc-url=jdbc:h2:mem:starterMain;DB_CLOSE_DELAY=-1",
+                    "metapool.datasources.main.username=sa",
+                    "metapool.datasources.main.maximum-pool-size=4",
+                    "metapool.datasources.main.tunable=maximum-pool-size,connection-timeout",
+                    "metapool.rate-limiters.order-api.limit-for-period=100",
+                    "metapool.rate-limiters.order-api.refill-period=1s",
+                    "metapool.rate-limiters.order-api.tunable=limit-for-period");
 
-    @Nested
-    @DisplayName("线程池自动装配")
-    class ThreadPoolAutoConfig {
+    @Test
+    void autoConfigures_registersBothResources_andBindsUnifiedMetrics() {
+        runner.run(ctx -> {
+            assertThat(ctx).hasSingleBean(ResourceManager.class);
+            ResourceManager mgr = ctx.getBean(ResourceManager.class);
 
-        private final ApplicationContextRunner runner = new ApplicationContextRunner()
-                .withUserConfiguration(
-                        MetaPoolAutoConfiguration.class,
-                        ThreadPoolAutoConfiguration.class)
-                .withPropertyValues(
-                        "metapool.db.enabled=false",
-                        "metapool.redis.enabled=false",
-                        "metapool.lock.enabled=false");
+            assertThat(mgr.resources()).hasSize(2);
+            assertThat(mgr.find("main")).isPresent();
+            assertThat(mgr.find("order-api")).isPresent();
+            assertThat(mgr.health().status()).isEqualTo(HealthStatus.Status.UP);
 
-        @Test
-        @DisplayName("默认启用时应创建线程池 Bean")
-        void shouldCreateThreadPoolBeansByDefault() {
-            runner.run(ctx -> {
-                assertThat(ctx).hasSingleBean(ThreadPoolConfig.class);
-                assertThat(ctx).hasSingleBean(ThreadResourcePool.class);
-            });
-        }
+            // 头牌证据：一个 MeterRegistry 同时持有连接池与限流器的统一 tag 指标
+            MeterRegistry registry = ctx.getBean(MeterRegistry.class);
+            assertThat(registry.find("metapool.datasource.connections.active")
+                    .tag("metapool.resource", "main").gauge()).isNotNull();
+            assertThat(registry.find("metapool.ratelimiter.available.tokens")
+                    .tag("metapool.resource", "order-api").gauge()).isNotNull();
 
-        @Test
-        @DisplayName("设为禁用时不应创建线程池 Bean")
-        void shouldNotCreateBeansWhenDisabled() {
-            runner.withPropertyValues("metapool.thread.enabled=false")
-                    .run(ctx -> {
-                        assertThat(ctx).doesNotHaveBean(ThreadPoolConfig.class);
-                        assertThat(ctx).doesNotHaveBean(ThreadResourcePool.class);
-                    });
-        }
-
-        @Test
-        @DisplayName("应正确绑定线程池配置属性")
-        void shouldBindThreadPoolProperties() {
-            runner.withPropertyValues(
-                            "metapool.thread.pool-name=test-thread-pool",
-                            "metapool.thread.core-pool-size=8",
-                            "metapool.thread.max-pool-size=32",
-                            "metapool.thread.keep-alive-seconds=120",
-                            "metapool.thread.queue-capacity=500",
-                            "metapool.thread.thread-name-prefix=test-"
-                    )
-                    .run(ctx -> {
-                        ThreadPoolConfig config = ctx.getBean(ThreadPoolConfig.class);
-                        assertThat(config.getPoolName()).isEqualTo("test-thread-pool");
-                        assertThat(config.getCorePoolSize()).isEqualTo(8);
-                        assertThat(config.getMaxPoolSize()).isEqualTo(32);
-                        assertThat(config.getKeepAliveSeconds()).isEqualTo(120);
-                        assertThat(config.getQueueCapacity()).isEqualTo(500);
-                        assertThat(config.getThreadNamePrefix()).isEqualTo("test-");
-                    });
-        }
+            // 统一动态调参
+            assertThat(mgr.tune("main", java.util.Map.of("maximum-pool-size", "8")).success()).isTrue();
+        });
     }
 
-    // ==================== 内存池自动装配 ====================
-
-    @Nested
-    @DisplayName("内存池自动装配")
-    class MemoryPoolAutoConfig {
-
-        private final ApplicationContextRunner runner = new ApplicationContextRunner()
-                .withUserConfiguration(
-                        MetaPoolAutoConfiguration.class,
-                        MemoryPoolAutoConfiguration.class)
-                .withPropertyValues(
-                        "metapool.db.enabled=false",
-                        "metapool.redis.enabled=false",
-                        "metapool.lock.enabled=false");
-
-        @Test
-        @DisplayName("默认启用时应创建内存池 Bean")
-        void shouldCreateMemoryPoolBeansByDefault() {
-            runner.run(ctx -> {
-                assertThat(ctx).hasSingleBean(MemoryPoolConfig.class);
-                assertThat(ctx).hasSingleBean(MemoryPool.class);
-            });
-        }
+    @Test
+    void disabled_flag_skipsAutoConfiguration() {
+        runner.withPropertyValues("metapool.enabled=false")
+                .run(ctx -> assertThat(ctx).doesNotHaveBean(ResourceManager.class));
     }
 
-    // ==================== 限流器自动装配 ====================
-
-    @Nested
-    @DisplayName("限流器自动装配")
-    class RateLimitAutoConfig {
-
-        private final ApplicationContextRunner runner = new ApplicationContextRunner()
-                .withUserConfiguration(
-                        MetaPoolAutoConfiguration.class,
-                        RateLimitAutoConfiguration.class)
-                .withPropertyValues(
-                        "metapool.db.enabled=false",
-                        "metapool.redis.enabled=false",
-                        "metapool.lock.enabled=false");
-
-        @Test
-        @DisplayName("默认启用时应创建限流器 Bean")
-        void shouldCreateRateLimiterBeansByDefault() {
-            runner.run(ctx -> {
-                assertThat(ctx).hasSingleBean(RateLimiterConfig.class);
-                assertThat(ctx).hasSingleBean(TokenBucketRateLimiter.class);
-            });
-        }
-
-        @Test
-        @DisplayName("应正确绑定限流器配置属性")
-        void shouldBindRateLimitProperties() {
-            runner.withPropertyValues(
-                            "metapool.rate-limit.permits-per-second=500",
-                            "metapool.rate-limit.warm-up-seconds=5"
-                    )
-                    .run(ctx -> {
-                        RateLimiterConfig config = ctx.getBean(RateLimiterConfig.class);
-                        assertThat(config.getPermitsPerSecond()).isEqualTo(500.0);
-                        assertThat(config.getWarmUpSeconds()).isEqualTo(5);
-                    });
-        }
-    }
-
-    // ==================== 组件扫描 ====================
-
-    @Nested
-    @DisplayName("组件扫描")
-    class ComponentScan {
-
-        @Test
-        @DisplayName("MetaPoolProperties 应作为 Bean 注册")
-        void shouldRegisterPropertiesBean() {
-            new ApplicationContextRunner()
-                    .withUserConfiguration(MetaPoolAutoConfiguration.class)
-                    .withPropertyValues(
-                            "metapool.db.enabled=false",
-                            "metapool.redis.enabled=false",
-                            "metapool.lock.enabled=false")
-                    .run(ctx -> {
-                        assertThat(ctx).hasSingleBean(MetaPoolProperties.class);
-                    });
+    @Configuration(proxyBeanMethods = false)
+    static class MeterRegistryConfig {
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
         }
     }
 }
