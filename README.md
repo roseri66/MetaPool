@@ -1,5 +1,6 @@
 # MetaPool — Java 资源治理控制面
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.roseri66/metapool-spring-starter?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.roseri66/metapool-spring-starter)
 [![JDK](https://img.shields.io/badge/JDK-17-orange)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen)](https://spring.io/projects/spring-boot)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)](.)
