@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.metapool</groupId>
+        <groupId>io.github.roseri66</groupId>
         <artifactId>metapool-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>2.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>metapool-core</artifactId>
@@ -18,20 +18,20 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.metapool</groupId>
+            <groupId>io.github.roseri66</groupId>
             <artifactId>metapool-common</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <!-- 集成测试：用真实适配器验证控制面（不引入编译期依赖，避免与 adapter 形成方向倒置） -->
         <dependency>
-            <groupId>com.metapool</groupId>
+            <groupId>io.github.roseri66</groupId>
             <artifactId>metapool-adapter-hikari</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.metapool</groupId>
+            <groupId>io.github.roseri66</groupId>
             <artifactId>metapool-adapter-bucket4j</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

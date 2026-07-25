@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.metapool</groupId>
+        <groupId>io.github.roseri66</groupId>
         <artifactId>metapool-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>2.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>metapool-examples</artifactId>
@@ -16,20 +16,25 @@
     <name>MetaPool Examples</name>
     <description>可运行的 Spring Boot 示例：同时纳管 datasource + rate-limiter，暴露 /actuator/metapool 与 Prometheus</description>
 
+    <properties>
+        <!-- 示例应用不发布到 Maven Central -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
     <dependencies>
         <dependency>
-            <groupId>com.metapool</groupId>
+            <groupId>io.github.roseri66</groupId>
             <artifactId>metapool-spring-starter</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 用到的资源类型对应的 adapter（SPI 自动发现） -->
         <dependency>
-            <groupId>com.metapool</groupId>
+            <groupId>io.github.roseri66</groupId>
             <artifactId>metapool-adapter-hikari</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.metapool</groupId>
+            <groupId>io.github.roseri66</groupId>
             <artifactId>metapool-adapter-bucket4j</artifactId>
             <version>${project.version}</version>
         </dependency>

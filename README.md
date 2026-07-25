@@ -65,16 +65,17 @@
 ### 方式一：Spring Boot（YAML 声明式，推荐）
 
 ```xml
+<!-- 可选：import BOM 统一对齐版本，则下方无需再写 version -->
 <dependency>
-    <groupId>com.metapool</groupId>
+    <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-spring-starter</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
 </dependency>
 <!-- 按需引入所用资源类型的 adapter（SPI 自动发现） -->
 <dependency>
-    <groupId>com.metapool</groupId>
+    <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-adapter-hikari</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -195,7 +196,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 扩展 | redis / object / executor / lock / memory 适配器 | 📋 |
-| 发布 | BOM + `io.github.*` groupId + Maven Central | 📋 |
+| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 就绪（待定版发布，见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 
 ## 这个项目是什么 / 不是什么
 
