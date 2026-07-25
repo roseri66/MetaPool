@@ -196,7 +196,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M2 | HikariCP 适配器 | ✅ |
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
-| 扩展 | redis / object / executor / lock / memory 适配器 | 📋 |
+| 扩展 | redis / object / executor / lock / memory 适配器（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 📋 |
 | 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 就绪（待定版发布，见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 
 ## 这个项目是什么 / 不是什么
