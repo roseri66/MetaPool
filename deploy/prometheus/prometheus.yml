@@ -14,13 +14,13 @@ rule_files:
 
 # ── 抓取目标 ──
 scrape_configs:
-  # MetaPool Java 应用（Agent 暴露的 Prometheus 端点）
+  # MetaPool Java 应用（Spring Actuator 暴露的 Prometheus 端点；见 metapool-examples）
   - job_name: "metapool-app"
     metrics_path: "/actuator/prometheus"
     scrape_interval: 10s
     static_configs:
       - targets:
-          - "host.docker.internal:9100"
+          - "host.docker.internal:8080"
         labels:
           application: "metapool"
           environment: "dev"

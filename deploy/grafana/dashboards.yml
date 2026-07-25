@@ -1,0 +1,13 @@
+# Grafana 仪表板 provisioning provider —— 启动时自动从目录加载 dashboards/*.json
+apiVersion: 1
+
+providers:
+  - name: "MetaPool"
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

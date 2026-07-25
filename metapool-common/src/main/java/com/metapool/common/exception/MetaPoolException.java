@@ -1,25 +1,26 @@
 package com.metapool.common.exception;
 
 /**
- * 智能资源池统一异常基类。
+ * MetaPool 统一异常基类。所有本框架抛出的运行时异常继承此类，并携带 {@link ErrorCode}。
  *
- * @since 0.1.0
+ * @since 2.0.0
  */
 public class MetaPoolException extends RuntimeException {
 
-    private final String errorCode;
+    private final ErrorCode errorCode;
 
-    public MetaPoolException(String errorCode, String message) {
+    public MetaPoolException(ErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }
 
-    public MetaPoolException(String errorCode, String message, Throwable cause) {
+    public MetaPoolException(ErrorCode errorCode, String message, Throwable cause) {
         super(message, cause);
         this.errorCode = errorCode;
     }
 
-    public String getErrorCode() {
+    /** 关联的错误码，绝不为 null。 */
+    public ErrorCode errorCode() {
         return errorCode;
     }
 }

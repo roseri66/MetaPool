@@ -4,27 +4,50 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.metapool</groupId>
+    <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>MetaPool Parent</name>
-    <description>智能多资源池统一管理系统 — 根 POM</description>
+    <description>MetaPool — Java 资源治理控制面：把 HikariCP/Bucket4j 等异构资源管理器纳入统一的生命周期、可观测、动态调参门面</description>
+    <url>https://github.com/roseri66/MetaPool</url>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>roseri66</id>
+            <name>roseri66</name>
+            <url>https://github.com/roseri66</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/roseri66/MetaPool.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/roseri66/MetaPool.git</developerConnection>
+        <url>https://github.com/roseri66/MetaPool</url>
+    </scm>
 
     <modules>
+        <module>metapool-bom</module>
         <module>metapool-common</module>
-        <module>metapool-pool-thread</module>
-        <module>metapool-pool-db</module>
-        <module>metapool-pool-redis</module>
-        <module>metapool-pool-rate-limit</module>
-        <module>metapool-pool-lock</module>
-        <module>metapool-pool-object</module>
-        <module>metapool-pool-memory</module>
-        <module>metapool-spi-ai</module>
-        <module>metapool-spi-alert</module>
-        <module>metapool-agent-core</module>
+        <module>metapool-core</module>
+        <module>metapool-adapter-hikari</module>
+        <module>metapool-adapter-bucket4j</module>
         <module>metapool-spring-starter</module>
+        <module>metapool-examples</module>
+        <module>metapool-benchmark</module>
+        <!--
+            2.0 迁移中：以下 1.0 自研池模块依赖已删除的旧契约，暂移出 reactor 保持构建绿。
+            源码保留在磁盘 / git 历史供改造参考，扩展阶段逐个重建为「治理适配器」后再加回：
+              metapool-pool-redis/object/thread/lock/memory (Lettuce/Commons-Pool2/JDK/Redisson/Netty)
+        -->
     </modules>
 
     <properties>
@@ -36,8 +59,8 @@
 
         <!-- 框架版本锁定 -->
         <spring-boot.version>3.4.3</spring-boot.version>
-        <byte-buddy.version>1.15.10</byte-buddy.version>
         <micrometer.version>1.14.5</micrometer.version>
+        <bucket4j.version>8.9.0</bucket4j.version>
         <lettuce.version>6.3.2.RELEASE</lettuce.version>
         <postgresql-driver.version>42.7.5</postgresql-driver.version>
         <testcontainers.version>1.20.6</testcontainers.version>
@@ -71,18 +94,18 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- ByteBuddy -->
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy</artifactId>
-                <version>${byte-buddy.version}</version>
-            </dependency>
-
             <!-- Micrometer -->
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-registry-prometheus</artifactId>
                 <version>${micrometer.version}</version>
+            </dependency>
+
+            <!-- Bucket4j：metapool-adapter-bucket4j 的编译期依赖 -->
+            <dependency>
+                <groupId>com.bucket4j</groupId>
+                <artifactId>bucket4j-core</artifactId>
+                <version>${bucket4j.version}</version>
             </dependency>
 
             <!-- Lettuce -->
@@ -159,12 +182,11 @@
                 <version>${redisson.version}</version>
                 <scope>test</scope>
             </dependency>
-            <!-- SPEC-V11-08: HikariCP -->
+            <!-- HikariCP：2.0 起作为 metapool-adapter-hikari 的编译期依赖（原 V1.1 仅用于对比基准） -->
             <dependency>
                 <groupId>com.zaxxer</groupId>
                 <artifactId>HikariCP</artifactId>
                 <version>${hikaricp.version}</version>
-                <scope>test</scope>
             </dependency>
             <!-- SPEC-V11-08/11: H2 for fair DB comparison -->
             <dependency>
@@ -186,6 +208,8 @@
                     <configuration>
                         <release>${maven.compiler.release}</release>
                         <encoding>${project.build.sourceEncoding}</encoding>
+                        <!-- 保留方法参数名：Spring Actuator @WriteOperation 参数绑定依赖它 -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -212,4 +236,66 @@
             </plugins>
         </pluginManagement>
     </build>
+
+    <profiles>
+        <!--
+            发布到 Maven Central 用：mvn -Prelease clean deploy
+            需先配置：~/.m2/settings.xml 的 server id=central（Sonatype Central token）+ 本地 GPG 密钥。
+            平时构建不激活本 profile，因此不依赖 GPG。详见 docs/PUBLISHING.md。
+        -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals><goal>jar-no-fork</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.7.0</version>
+                        <configuration>
+                            <doclint>none</doclint>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals><goal>jar</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.4</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals><goal>sign</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>false</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -5,28 +5,31 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.metapool</groupId>
+        <groupId>io.github.roseri66</groupId>
         <artifactId>metapool-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>2.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>metapool-common</artifactId>
     <packaging>jar</packaging>
 
     <name>MetaPool Common</name>
-    <description>基础设施层 — 资源生命周期接口、抽象池基类、SPI 体系、异常枚举</description>
-
-    <!-- 零外部依赖（compile scope） -->
+    <description>契约层 — 治理抽象（ManagedResource/Lifecycle/Metrics/Tunable）、能力接口、控制面接口、SPI、异常</description>
 
     <dependencies>
+        <!-- 可观测契约依赖 Micrometer 的 MeterRegistry 类型 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

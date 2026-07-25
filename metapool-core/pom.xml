@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.roseri66</groupId>
+        <artifactId>metapool-parent</artifactId>
+        <version>2.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>metapool-core</artifactId>
+    <packaging>jar</packaging>
+
+    <name>MetaPool Core</name>
+    <description>控制面实现 — DefaultResourceManager（注册表 + 启停编排 + 聚合健康 + 调参）、SPI 加载器</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- 集成测试：用真实适配器验证控制面（不引入编译期依赖，避免与 adapter 形成方向倒置） -->
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-adapter-hikari</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-adapter-bucket4j</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- micrometer-core 由 metapool-common 以 compile 传递而来，测试用 SimpleMeterRegistry 亦可见 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
