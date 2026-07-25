@@ -54,6 +54,21 @@ class Bucket4jAdapterTest {
     }
 
     @Test
+    void restart_afterStop_yieldsUsableLimiter() {
+        Bucket4jAdapter rl = Bucket4jAdapter.builder()
+                .named("api").limitForPeriod(3).refillPeriod(Duration.ofMinutes(1)).build();
+        rl.start();
+        assertTrue(rl.tryAcquire(1));
+        rl.stop(Duration.ZERO);
+        assertEquals(HealthStatus.Status.DOWN, rl.health().status());
+
+        rl.start();   // 重启后额度应恢复
+        assertEquals(HealthStatus.Status.UP, rl.health().status());
+        assertTrue(rl.tryAcquire(1));
+        rl.stop(Duration.ZERO);
+    }
+
+    @Test
     void metrics_unifiedTags() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         Bucket4jAdapter rl = Bucket4jAdapter.builder()

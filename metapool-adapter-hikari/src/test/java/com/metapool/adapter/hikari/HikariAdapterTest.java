@@ -64,6 +64,22 @@ class HikariAdapterTest {
     }
 
     @Test
+    void restart_afterStop_yieldsUsablePool() throws Exception {
+        HikariAdapter ds = HikariAdapter.from(h2Config()).named("main").build();
+        ds.start();
+        ds.release(ds.borrow());
+        ds.stop(Duration.ofSeconds(2));
+        assertEquals(HealthStatus.Status.DOWN, ds.health().status());
+
+        ds.start();   // 重启：修复前会因 dataSource!=null 静默跳过，留下已关闭的池
+        assertEquals(HealthStatus.Status.UP, ds.health().status());
+        Connection c = ds.borrow();   // 必须可用
+        assertNotNull(c);
+        ds.release(c);
+        ds.stop(Duration.ZERO);
+    }
+
+    @Test
     void metrics_boundBeforeStart_areOrderIndependent() throws Exception {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         HikariAdapter ds = HikariAdapter.from(h2Config()).named("orders").build();

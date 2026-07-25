@@ -121,13 +121,16 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
     }
 
     @Override
-    public void stop(Duration graceful) {
+    public synchronized void stop(Duration graceful) {
         HikariDataSource ds = this.dataSource;
-        if (ds == null || ds.isClosed()) {
+        if (ds == null) {
             return; // 幂等
         }
-        drain(ds, graceful);
-        ds.close();
+        this.dataSource = null;   // 先置空：使 start() 可重启，且 health/metrics 立即视为已停
+        if (!ds.isClosed()) {
+            drain(ds, graceful);
+            ds.close();
+        }
         log.info("[MetaPool] datasource '{}' stopped", name);
     }
 
