@@ -69,13 +69,13 @@
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-spring-starter</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.0.0</version>
 </dependency>
 <!-- 按需引入所用资源类型的 adapter（SPI 自动发现） -->
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-adapter-hikari</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
