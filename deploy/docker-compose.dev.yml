@@ -103,14 +103,13 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/global-health.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/metapool-overview.json
     ports:
       - "3000:3000"
     volumes:
       - ./grafana/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
-      - ./grafana/dashboards/thread-pool.json:/etc/grafana/dashboards/thread-pool.json:ro
-      - ./grafana/dashboards/connection-pool.json:/etc/grafana/dashboards/connection-pool.json:ro
-      - ./grafana/dashboards/global-health.json:/etc/grafana/dashboards/global-health.json:ro
+      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/metapool.yml:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
       - grafanadata-dev:/var/lib/grafana
     networks:
       - metapool-net

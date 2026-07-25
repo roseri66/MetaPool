@@ -1,86 +1,46 @@
 # ============================================================
-# MetaPool — Prometheus 告警规则（SPEC-19）
-# 6 条规则覆盖资源耗尽/泄露/连接超时/队列积压/拒绝/锁竞争
+# MetaPool — Prometheus 告警规则（2.0）
+# 基于治理控制面实际导出的指标（metapool_datasource_* / metapool_ratelimiter_*）
 # ============================================================
 
 groups:
   - name: metapool-alerts
     rules:
-      # ── 1. 资源池耗尽 ──
-      - alert: PoolExhausted
-        expr: metapool_thread_pending_count > 100
+      # ── 1. 连接池饱和：有线程在等待获取连接 ──
+      - alert: DatasourcePendingHigh
+        expr: metapool_datasource_connections_pending > 5
         for: 1m
         labels:
           severity: critical
-          category: pool
+          category: datasource
         annotations:
-          summary: "MetaPool 资源池耗尽 — pending 请求超过阈值"
+          summary: "MetaPool 连接池饱和 — 有请求在排队等待连接"
           description: >
-            资源池 {{ $labels.pool_name }} 的 pending 请求数已达 {{ $value }}，
-            持续超过 1 分钟。请检查线程池/连接池配置或下游依赖健康状况。
+            数据源 {{ $labels.metapool_resource }} 的等待获取连接的线程数达 {{ $value }}，
+            持续超过 1 分钟。请检查 maximum-pool-size（可经 /actuator/metapool 热调）或下游数据库健康。
 
-      # ── 2. 资源泄露检测 ──
-      - alert: ResourceLeakDetected
-        expr: metapool_db_connection_leak_total > 0
-        for: 1m
-        labels:
-          severity: warning
-          category: leak
-        annotations:
-          summary: "MetaPool 检测到资源泄露"
-          description: >
-            资源池 {{ $labels.pool_name }} 检测到连接泄露，泄露计数 {{ $value }}。
-            请检查业务代码是否在所有路径（含异常路径）中正确归还资源。
-
-      # ── 3. 连接获取超时 ──
-      - alert: ConnectionTimeout
-        expr: rate(metapool_db_connection_timeout_total[5m]) * 300 > 10
-        for: 1m
-        labels:
-          severity: critical
-          category: connection
-        annotations:
-          summary: "MetaPool 连接获取超时频发"
-          description: >
-            资源池 {{ $labels.pool_name }} 在过去 5 分钟内连接超时次数 > 10 次。
-            请检查数据库连接数上限（max_connections）和池 max-pool-size 配置。
-
-      # ── 4. 队列深度过高 ──
-      - alert: HighQueueDepth
-        expr: (metapool_thread_queue_size / metapool_thread_queue_capacity) > 0.9
-        for: 1m
-        labels:
-          severity: warning
-          category: capacity
-        annotations:
-          summary: "MetaPool 任务队列积压严重 — 使用率超过 90%"
-          description: >
-            线程池 {{ $labels.pool_name }} 队列使用率 {{ $value | humanizePercentage }}。
-            当前队列深度 {{ $labels.queue_size }}/{{ $labels.queue_capacity }}。
-            考虑增大 max-pool-size 或优化下游处理速度。
-
-      # ── 5. 线程池任务拒绝 ──
-      - alert: ThreadPoolRejection
-        expr: rate(metapool_thread_rejected_total[5m]) * 300 > 100
-        for: 1m
-        labels:
-          severity: critical
-          category: rejection
-        annotations:
-          summary: "MetaPool 线程池大量拒绝任务"
-          description: >
-            线程池 {{ $labels.pool_name }} 在过去 5 分钟内拒绝任务 > 100 次。
-            请检查拒绝策略配置、队列容量、max-pool-size 是否合理。
-
-      # ── 6. 分布式锁高竞争 ──
-      - alert: LockHighContention
-        expr: metapool_lock_contention_count > 10
+      # ── 2. 连接池无空闲：空闲连接为 0 且总连接已达峰 ──
+      - alert: DatasourceNoIdle
+        expr: metapool_datasource_connections_idle == 0 and metapool_datasource_connections_pending > 0
         for: 2m
         labels:
           severity: warning
-          category: lock
+          category: datasource
         annotations:
-          summary: "MetaPool 分布式锁竞争激烈"
+          summary: "MetaPool 连接池长时间无空闲连接"
           description: >
-            锁 {{ $labels.lock_name }} 当前等待线程数 {{ $value }}，持续超过 2 分钟。
-            请检查锁持有时间是否过长，或考虑拆分锁粒度。
+            数据源 {{ $labels.metapool_resource }} 已 2 分钟无空闲连接且有等待者。
+            考虑热调 maximum-pool-size 或排查慢查询。
+
+      # ── 3. 限流持续拒绝：说明流量超过配额 ──
+      - alert: RateLimiterRejecting
+        expr: sum by (metapool_resource) (rate(metapool_ratelimiter_rejected_total[5m])) > 0
+        for: 2m
+        labels:
+          severity: warning
+          category: rate-limiter
+        annotations:
+          summary: "MetaPool 限流器持续拒绝请求"
+          description: >
+            限流器 {{ $labels.metapool_resource }} 在过去 5 分钟持续产生拒绝。
+            若为预期削峰可忽略；否则考虑热调 limit-for-period（/actuator/metapool）。

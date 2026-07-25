@@ -133,6 +133,18 @@ POST /actuator/metapool/main   {"key": "maximum-pool-size", "value": "40"}
 
 底层：HikariCP 走 `HikariConfigMXBean`，Bucket4j 走 `replaceConfiguration`——MetaPool 统一成一个 `apply(patch)` 门面，仅允许白名单参数，带审计。
 
+### 本地起监控栈（Prometheus + Grafana）
+
+```bash
+mvn -pl metapool-examples spring-boot:run      # 示例应用，暴露 /actuator/prometheus
+docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana + AlertManager
+# Grafana http://localhost:3000 (admin/admin) → 首页即 "MetaPool — Resource Governance Overview"
+```
+
+预置看板 [`deploy/grafana/dashboards/metapool-overview.json`](deploy/grafana/dashboards/metapool-overview.json)
+在**同一屏**展示连接池状态（active/idle/pending）与限流器（可用令牌 / 放行·拒绝速率），
+指标名与告警规则见 [`deploy/`](deploy)。
+
 ---
 
 ## 核心抽象
