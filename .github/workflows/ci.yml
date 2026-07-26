@@ -30,12 +30,12 @@ jobs:
         java: ['17']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # setup-java 会把 JAVA_HOME 指向所选 JDK，因此 CI 上不会重演坑 P-03；
       # 父 pom 的 enforcer 仍会在 validate 阶段兜底校验。
       - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: surefire-reports-${{ matrix.os }}-jdk${{ matrix.java }}
           path: '**/target/surefire-reports/**'
