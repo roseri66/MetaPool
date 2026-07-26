@@ -10,7 +10,18 @@
 MetaPool 1.0 忠实实现了原始 BRD/PRD 的方向——**自研 7 类工业级资源池**（thread / db / redis / object /
 memory / rate-limit / lock）。但这个方向在架构上是死路：
 
-- 每个自研池都打不过对应的专用成熟件（HikariCP / Redisson / Bucket4j / Netty …），压测必输；
+- 每个自研池都打不过对应的专用成熟件（HikariCP / Redisson / Bucket4j / Netty …），压测必输。
+  1.0 自己的 JMH 实测（2026-07-07）就是证据 —— 自研线程池对 JDK `ThreadPoolExecutor`：
+
+  | 场景 | 自研 (ops/s) | JDK (ops/s) | 自研/JDK |
+  |---|---:|---:|:--:|
+  | 单线程 | 47.8M | 99.5M | **48%** |
+  | 4 线程 | 30.8M | 59.7M | **52%** |
+
+  已经用双检锁消除了热路径锁竞争，仍只有 JDK 的一半。限流器也一样：`synchronized` 竞争是主要瓶颈，
+  4 线程吞吐量降到单线程的 49%。**结论：投入再多也是在追赶一个免费且更成熟的对手**——
+  这正是转向「治理成熟库」的实测依据。（原始数据出自 1.0 的开发进度文档，该文档已随 2.0 清理删除，
+  完整内容见 git 历史与 `v1.0.0` 标签。）
 - 为了「统一」，用一个 `ResourceLifecycle<T>{ acquire(); release(T); }` 接口硬套 7 类资源，导致
   **里氏替换原则（LSP）系统性破坏**：
   - `ThreadResourcePool.acquire()` → `throw UnsupportedOperationException`
