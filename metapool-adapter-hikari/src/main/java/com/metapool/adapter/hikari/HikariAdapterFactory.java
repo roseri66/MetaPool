@@ -40,7 +40,7 @@ public final class HikariAdapterFactory implements ResourceAdapterFactory {
             return HikariAdapter.from(config)
                     .named(definition.name())
                     .tunable(definition.tunableKeys().isEmpty()
-                            ? java.util.Set.of(HikariAdapter.KEY_MAX_POOL_SIZE, HikariAdapter.KEY_CONNECTION_TIMEOUT)
+                            ? HikariAdapter.SUPPORTED_TUNABLE_KEYS
                             : definition.tunableKeys())
                     .build();
         } catch (RuntimeException e) {

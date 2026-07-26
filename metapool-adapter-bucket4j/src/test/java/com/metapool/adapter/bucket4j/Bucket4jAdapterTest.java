@@ -1,6 +1,7 @@
 package com.metapool.adapter.bucket4j;
 
 import com.metapool.common.capability.Pool;
+import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.spi.ResourceDefinition;
 import com.metapool.common.stats.HealthStatus;
@@ -16,6 +17,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -148,6 +150,20 @@ class Bucket4jAdapterTest {
         rl.stop(Duration.ZERO);
         rl.stop(Duration.ZERO);   // 重复停机
         assertEquals(HealthStatus.Status.DOWN, rl.health().status());
+    }
+
+    /** 坑 P-13：tunable 白名单里不支持的 key 必须构建期就报，而不是等运维调参时才返回 rejected。 */
+    @Test
+    void unsupportedTunableKey_failsFastAtBuildTime() {
+        MetaPoolConfigException e = assertThrows(MetaPoolConfigException.class,
+                () -> Bucket4jAdapter.builder().named("api").limitForPeriod(10)
+                        .tunable(Set.of("refill-period"))   // 不支持热调
+                        .build());
+        assertTrue(e.getMessage().contains("refill-period"), e.getMessage());
+
+        var def = new ResourceDefinition("order-api", "rate-limiter",
+                Map.of("limit-for-period", 100), Set.of("limit-per-period"));  // 拼错
+        assertThrows(MetaPoolConfigException.class, () -> new Bucket4jAdapterFactory().create(def));
     }
 
     @Test

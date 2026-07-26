@@ -44,7 +44,7 @@ public final class Bucket4jAdapterFactory implements ResourceAdapterFactory {
         Duration refill = parseDuration(props.getOrDefault("refill-period", "1s"));
 
         Set<String> tunable = definition.tunableKeys().isEmpty()
-                ? Set.of(Bucket4jAdapter.KEY_LIMIT_FOR_PERIOD)
+                ? Bucket4jAdapter.SUPPORTED_TUNABLE_KEYS
                 : definition.tunableKeys();
 
         return Bucket4jAdapter.builder()

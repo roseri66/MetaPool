@@ -61,6 +61,15 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
     /** 内置可热调参数（kebab-case，与 YAML/tunable 声明一致）。 */
     static final String KEY_LIMIT_FOR_PERIOD = "limit-for-period";
 
+    /**
+     * 本适配器能够热调的全部参数。配置里声明的 {@code tunable} 白名单必须是它的子集 ——
+     * 否则构建期即失败（fail-fast，RULES §3.3），不留到运维真去调参时才报（见坑 P-13）。
+     *
+     * <p>{@code refill-period} 不在其中：改补充周期等于换一条 Bandwidth 的时间基准，
+     * 语义上是重建限流器而非调参，故只允许重启时经配置变更。
+     */
+    static final Set<String> SUPPORTED_TUNABLE_KEYS = Set.of(KEY_LIMIT_FOR_PERIOD);
+
     private final String name;
     private final Duration refillPeriod;
     private final Set<String> tunableKeys;
@@ -83,7 +92,19 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
             throw new MetaPoolConfigException("refill-period must be positive, got " + refillPeriod);
         }
         this.limitForPeriod = limitForPeriod;
-        this.tunableKeys = Set.copyOf(tunableKeys);
+        this.tunableKeys = validateTunableKeys(name, tunableKeys);
+    }
+
+    /** 启动前就拒掉拼错/不支持的 tunable key，而不是等到调参时返回 rejected。 */
+    private static Set<String> validateTunableKeys(String name, Set<String> keys) {
+        Objects.requireNonNull(keys, "tunableKeys must not be null");
+        Set<String> unsupported = new LinkedHashSet<>(keys);
+        unsupported.removeAll(SUPPORTED_TUNABLE_KEYS);
+        if (!unsupported.isEmpty()) {
+            throw new MetaPoolConfigException("rate-limiter '" + name + "' declares unsupported tunable key(s) "
+                    + unsupported + "; supported: " + SUPPORTED_TUNABLE_KEYS);
+        }
+        return Set.copyOf(keys);
     }
 
     public static Builder builder() {
@@ -253,7 +274,7 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
         private String name;
         private long limitForPeriod = -1;
         private Duration refillPeriod = Duration.ofSeconds(1);
-        private Set<String> tunableKeys = Set.of(KEY_LIMIT_FOR_PERIOD);
+        private Set<String> tunableKeys = SUPPORTED_TUNABLE_KEYS;
 
         private Builder() {
         }
