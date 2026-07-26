@@ -1,5 +1,7 @@
 # MetaPool — Java 资源治理控制面
 
+**简体中文** · [English](README.en.md)
+
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.roseri66/metapool-spring-starter?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.roseri66/metapool-spring-starter)
 [![JDK](https://img.shields.io/badge/JDK-17-orange)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen)](https://spring.io/projects/spring-boot)
@@ -202,7 +204,8 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 扩展 | redis / object / executor / lock / memory 适配器（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 📋 |
-| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 就绪（待定版发布，见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
+| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.0.1`（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
+| CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 
 ## 这个项目是什么 / 不是什么
 
