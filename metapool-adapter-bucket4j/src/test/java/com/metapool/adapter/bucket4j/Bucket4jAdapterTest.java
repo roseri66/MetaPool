@@ -98,7 +98,7 @@ class Bucket4jAdapterTest {
 
         TuneResult ok = rl.apply(Map.of("limit-for-period", 10));
         assertTrue(ok.success());
-        // 提高上限后（PROPORTIONALLY 继承），应重新有额度
+        // 提高上限后（ADDITIVE 继承：增量额度立即授予当前桶），应重新有额度
         assertTrue(rl.tryAcquire(1));
 
         TuneResult rejected = rl.apply(Map.of("refill-period", "5s"));
