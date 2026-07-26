@@ -100,7 +100,9 @@
 
 ### P-03 JAVA_HOME 默认指向 JDK 8，报「无效的目标发行版: 17」
 - **现象**：`mvn` 构建/deploy 直接失败。
-- **原因**：机器上同时装了 `C:\Program Files\Java\jdk-1.8`（8）和 `C:\Program Files\ojdkbuild\java-17-...`（17），**用户级与机器级 `JAVA_HOME` 都是前者**，所以每开一个新终端都是 JDK 8。
+- **原因**：机器上同时装了 `C:\Program Files\Java\jdk-1.8`（8）和 `C:\Program Files\ojdkbuild\java-17-...`（17），而终端起来后 `JAVA_HOME` 反复是前者。
+  - 2026-07-26 查清的注册表实况：**HKCU（用户级）原本为空**，**HKLM（机器级）存的是 Unix 风格路径 `/c/Program Files/ojdkbuild/...`——在 Windows 上无效**。已把 HKCU 设为正确的 `C:\Program Files\ojdkbuild\java-17-openjdk-17.0.3.0.6-1`（非 PATH 类变量 User 覆盖 Machine，故新终端取到 JDK 17）。**HKLM 那条无效值仍待清理（需管理员权限）。**
+  - 排查提醒：`$env:JAVA_HOME` 是**进程**环境，子进程继承父进程环境块而非重读注册表，所以「开个子 shell 看看」验不出持久化配置。要查实际存的值就直接读注册表（`HKCU:\Environment`、`HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment`）。
 - **修法**：构建前设 `JAVA_HOME` 指向 JDK 17；deploy 前务必先 `mvn -v` 确认显示 `Java version: 17.x`。
   - PowerShell：`$env:JAVA_HOME = "C:\Program Files\ojdkbuild\java-17-openjdk-17.0.3.0.6-1"`
   - Git Bash：`export JAVA_HOME='/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1'`

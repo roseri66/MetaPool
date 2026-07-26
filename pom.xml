@@ -77,6 +77,7 @@
         <h2.version>2.2.224</h2.version>
 
         <!-- 插件 -->
+        <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
         <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
@@ -164,6 +165,52 @@
     </dependencyManagement>
 
     <build>
+        <plugins>
+            <!--
+                JDK 版本守门（坑 P-03 的根治）。本机用户级 JAVA_HOME 长期指向 JDK 8，
+                而 javac 的原生报错「无效的目标发行版: 17」完全不提是哪个 JDK、在哪，
+                导致同一个坑踩了两次。这里在 validate 阶段就拦下并打印可操作的信息。
+                只做检查，不改任何产物内容。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-jdk17</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                    <!--
+                                        故意用纯 ASCII 英文：这条消息只在「跑错 JDK」时出现，
+                                        而那时往往正是 JDK 8 + GBK 控制台，中文会变成乱码 ——
+                                        一条只在它唯一的失败场景下读不出来的提示等于没写。
+                                        中文详解在 docs/RULES.md 台账 P-03。
+                                    -->
+                                    <message>
+MetaPool requires JDK 17+ to build. Your JAVA_HOME points at an older JDK.
+
+This machine has both JDK 8 (C:\Program Files\Java\jdk-1.8) and JDK 17
+(C:\Program Files\ojdkbuild\java-17-openjdk-17.0.3.0.6-1) installed, and shells
+have repeatedly come up on JDK 8. Set it for the current shell:
+
+  PowerShell : $env:JAVA_HOME = "C:\Program Files\ojdkbuild\java-17-openjdk-17.0.3.0.6-1"
+  Git Bash   : export JAVA_HOME='/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1'
+
+Then run 'mvn -v' and confirm it prints "Java version: 17.x" before continuing.
+See docs/RULES.md pitfall P-03 for the full story.
+                                    </message>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+
         <pluginManagement>
             <plugins>
                 <plugin>
