@@ -22,13 +22,32 @@ MetaPool 使用 `io.github.roseri66` 作为 groupId（GitHub 用户名反向域�
 ## 发布
 
 ```bash
-# 1. 去掉 -SNAPSHOT，定版（如 2.0.0）
-mvn versions:set -DnewVersion=2.0.0
+# 0. 确认 JAVA_HOME 指向 JDK 17（本机默认可能是 JDK 8，见 RULES 台账 P-03）
+export JAVA_HOME='/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1'
 
-# 2. 用 release profile 构建 + 签名 + 上传（source/javadoc/gpg 均在该 profile 内）
+# 1. 去掉 -SNAPSHOT，定版（如 2.0.1）
+#    注意：不要用 mvn versions:set —— 本机插件解析会挂住（P-04），用 sed 直接替换
+sed -i 's|<version>2.1.0-SNAPSHOT</version>|<version>2.0.1</version>|g' pom.xml metapool-*/pom.xml
+grep -rn SNAPSHOT pom.xml metapool-*/pom.xml    # 应无输出
+
+# 2. 先本地验一遍产物（跳过签名，避免 GPG 交互）：测试全绿 + source/javadoc jar 能出
+mvn -Prelease clean package -Dgpg.skip=true
+
+# 3. 用 release profile 构建 + 签名 + 上传（source/javadoc/gpg 均在该 profile 内）
 mvn -Prelease clean deploy
 
 # autoPublish=false：产物上传后在 https://central.sonatype.com 的 Deployments 里人工确认发布
+```
+
+发布确认后收尾：
+
+```bash
+git tag -a v2.0.1 -m "MetaPool 2.0.1"          # 打 tag
+# GitHub 建 Release，正文取 CHANGELOG.md 对应小节
+
+# 回到下一个开发周期
+sed -i 's|<version>2.0.1</version>|<version>2.1.0-SNAPSHOT</version>|g' pom.xml metapool-*/pom.xml
+git commit -am "chore: begin next dev cycle — 2.1.0-SNAPSHOT"
 ```
 
 发布的构件（`metapool-bom` 与各库；`metapool-examples` / `metapool-benchmark` 已设 `maven.deploy.skip`）：
@@ -50,7 +69,7 @@ mvn -Prelease clean deploy
     <dependency>
       <groupId>io.github.roseri66</groupId>
       <artifactId>metapool-bom</artifactId>
-      <version>2.0.0</version>
+      <version>2.0.1</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
