@@ -1,6 +1,7 @@
 package com.metapool.adapter.bucket4j;
 
 import com.metapool.common.capability.RateLimiter;
+import com.metapool.common.exception.ErrorCode;
 import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.exception.MetaPoolException;
 import com.metapool.common.resource.ManagedResource;
@@ -12,7 +13,6 @@ import com.metapool.common.stats.TuneResult;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
-import io.github.bucket4j.Refill;
 import io.github.bucket4j.TokensInheritanceStrategy;
 import io.micrometer.core.instrument.FunctionCounter;
 import io.micrometer.core.instrument.Gauge;
@@ -80,7 +80,6 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     private final AtomicLong totalAcquired = new AtomicLong();
     private final AtomicLong totalRejected = new AtomicLong();
-    private volatile boolean metricsBound;
 
     Bucket4jAdapter(String name, long limitForPeriod, Duration refillPeriod, Set<String> tunableKeys) {
         this.name = Objects.requireNonNull(name, "name must not be null");
@@ -150,17 +149,15 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
         return bucket != null ? HealthStatus.up() : HealthStatus.down("not started");
     }
 
+    /** greedy 补充：额度在周期内平滑释放，而非到点一次性放满。 */
     private Bandwidth bandwidth(long tokens) {
-        return Bandwidth.classic(tokens, Refill.greedy(tokens, refillPeriod));
+        return Bandwidth.builder().capacity(tokens).refillGreedy(tokens, refillPeriod).build();
     }
 
     // ==================== MetricsSource ====================
 
     @Override
-    public synchronized void bindTo(MeterRegistry registry) {
-        if (metricsBound) {
-            return;
-        }
+    public void bindTo(MeterRegistry registry) {
         Tags tags = Tags.of("metapool.resource", name, "metapool.type", type());
         Gauge.builder("metapool.ratelimiter.available.tokens", this, Bucket4jAdapter::sampleAvailable)
                 .tags(tags).register(registry);
@@ -168,7 +165,6 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
                 .tags(tags).register(registry);
         FunctionCounter.builder("metapool.ratelimiter.rejected.total", totalRejected, AtomicLong::doubleValue)
                 .tags(tags).register(registry);
-        metricsBound = true;
     }
 
     private double sampleAvailable() {
@@ -180,6 +176,7 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     @Override
     public boolean tryAcquire(int permits) {
+        requirePositivePermits(permits);
         boolean ok = requireStarted().tryConsume(permits);
         record(ok);
         return ok;
@@ -187,9 +184,19 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     @Override
     public boolean tryAcquire(int permits, Duration timeout) throws InterruptedException {
+        requirePositivePermits(permits);
+        Objects.requireNonNull(timeout, "timeout must not be null");
         boolean ok = requireStarted().asBlocking().tryConsume(permits, timeout);
         record(ok);
         return ok;
+    }
+
+    /** 前置校验，避免 Bucket4j 抛出的裸 IllegalArgumentException 逃出 MetaPoolException 契约（§3.2）。 */
+    private void requirePositivePermits(int permits) {
+        if (permits <= 0) {
+            throw new MetaPoolException(ErrorCode.CONFIG_INVALID,
+                    "rate-limiter '" + name + "': permits must be positive, got " + permits);
+        }
     }
 
     @Override
@@ -212,6 +219,7 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     @Override
     public TuneResult apply(Map<String, Object> patch) {
+        Objects.requireNonNull(patch, "patch must not be null");
         Bucket b = this.bucket;
         Map<String, String> rejected = new LinkedHashMap<>();
         Set<String> applied = new LinkedHashSet<>();

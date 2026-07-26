@@ -1,6 +1,7 @@
 package com.metapool.adapter.hikari;
 
 import com.metapool.common.capability.Pool;
+import com.metapool.common.exception.ErrorCode;
 import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.exception.MetaPoolException;
 import com.metapool.common.exception.PoolExhaustedException;
@@ -94,7 +95,9 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
 
     /** 由 start() 创建；volatile 供 metrics/health 无锁读取 */
     private volatile HikariDataSource dataSource;
-    private volatile boolean metricsBound;
+
+    /** 仅在 stop() 的 drain 窗口内为 true，用于把新请求的报错从「未启动」区分为「正在停机」 */
+    private volatile boolean stopping;
 
     HikariAdapter(String name, HikariConfig config, Set<String> tunableKeys) {
         this.name = Objects.requireNonNull(name, "name must not be null");
@@ -154,9 +157,14 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
             return; // 幂等
         }
         this.dataSource = null;   // 先置空：使 start() 可重启，且 health/metrics 立即视为已停
-        if (!ds.isClosed()) {
-            drain(ds, graceful);
-            ds.close();
+        this.stopping = true;     // drain 期间让新请求收到 SHUTTING_DOWN 而非 "not started"
+        try {
+            if (!ds.isClosed()) {
+                drain(ds, graceful);
+                ds.close();
+            }
+        } finally {
+            this.stopping = false;
         }
         log.info("[MetaPool] datasource '{}' stopped", name);
     }
@@ -200,17 +208,22 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
 
     // ==================== MetricsSource ====================
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>幂等由 Micrometer 自身保证（同名同 tag 的 meter 重复注册返回已有实例），因此这里不再自持
+     * "已绑定" 标志 —— 那个标志会让<b>第二个</b> registry 静默拿不到任何指标（见坑 P-14）。
+     *
+     * <p>注意 {@code metapool.datasource.connections.total} 在 Prometheus 端点上导出为
+     * {@code metapool_datasource_connections}：客户端会剥掉 {@code _total} 后缀。写 PromQL 时按后者。
+     */
     @Override
-    public synchronized void bindTo(MeterRegistry registry) {
-        if (metricsBound) {
-            return; // 幂等
-        }
+    public void bindTo(MeterRegistry registry) {
         Tags tags = Tags.of("metapool.resource", name, "metapool.type", type());
         gauge(registry, "metapool.datasource.connections.active", tags, m -> m.getActiveConnections());
         gauge(registry, "metapool.datasource.connections.idle", tags, m -> m.getIdleConnections());
         gauge(registry, "metapool.datasource.connections.total", tags, m -> m.getTotalConnections());
         gauge(registry, "metapool.datasource.connections.pending", tags, m -> m.getThreadsAwaitingConnection());
-        metricsBound = true;
     }
 
     private void gauge(MeterRegistry registry, String metric, Tags tags, PoolGauge fn) {
@@ -278,8 +291,7 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
             throw new PoolExhaustedException(
                     "datasource '" + name + "' exhausted (connectionTimeout exceeded)", e);
         } catch (SQLException e) {
-            throw new MetaPoolException(
-                    com.metapool.common.exception.ErrorCode.INTERNAL,
+            throw new MetaPoolException(ErrorCode.INTERNAL,
                     "datasource '" + name + "' getConnection failed: " + e.getMessage(), e);
         }
     }
@@ -324,8 +336,16 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
         return tunableKeys;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>生效的参数会同时回写到本适配器持有的 {@link HikariConfig}，因此 {@code stop()} → {@code start()}
+     * 之后调参结果<b>不丢</b>——与 {@code Bucket4jAdapter} 的行为一致（此前两个 adapter 语义不同，
+     * Hikari 会静默退回原始池大小，见坑 P-15）。
+     */
     @Override
     public TuneResult apply(Map<String, Object> patch) {
+        Objects.requireNonNull(patch, "patch must not be null");
         HikariDataSource ds = this.dataSource;
         Map<String, String> rejected = new LinkedHashMap<>();
         var applied = new java.util.LinkedHashSet<String>();
@@ -346,11 +366,13 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
                     case KEY_MAX_POOL_SIZE -> {
                         int v = requirePositiveInt(e.getValue());
                         ds.getHikariConfigMXBean().setMaximumPoolSize(v);
+                        config.setMaximumPoolSize(v);   // 回写，使 stop→start 后调参结果不丢
                         applied.add(key);
                     }
                     case KEY_CONNECTION_TIMEOUT -> {
                         long v = requirePositiveLong(e.getValue());
                         ds.getHikariConfigMXBean().setConnectionTimeout(v);
+                        config.setConnectionTimeout(v);
                         applied.add(key);
                     }
                     default -> rejected.put(key, "unsupported by HikariAdapter");
@@ -370,9 +392,12 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
     private HikariDataSource requireStarted() {
         HikariDataSource ds = this.dataSource;
         if (ds == null || ds.isClosed()) {
-            throw new MetaPoolException(
-                    com.metapool.common.exception.ErrorCode.INTERNAL,
-                    "datasource '" + name + "' not started");
+            // 优雅停机窗口内要给出可区分的语义：调用方据此重试别处，而不是当成配置/内部错误
+            if (stopping) {
+                throw new MetaPoolException(ErrorCode.SHUTTING_DOWN,
+                        "datasource '" + name + "' is shutting down, not accepting new connections");
+            }
+            throw new MetaPoolException(ErrorCode.INTERNAL, "datasource '" + name + "' not started");
         }
         return ds;
     }

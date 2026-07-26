@@ -6,7 +6,6 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -62,7 +61,8 @@ public class GovernanceOverheadBenchmark {
 
         // 大但合法（≤ 1 token/ns）且基准期内不会耗尽的速率，确保测的是调用开销而非限流触发
         long permits = 500_000_000L;
-        Bandwidth bw = Bandwidth.classic(permits, Refill.greedy(permits, Duration.ofSeconds(1)));
+        Bandwidth bw = Bandwidth.builder()
+                .capacity(permits).refillGreedy(permits, Duration.ofSeconds(1)).build();
         rawBucket = Bucket.builder().addLimit(bw).build();
 
         governedRl = Bucket4jAdapter.builder()

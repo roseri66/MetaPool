@@ -86,7 +86,7 @@ public final class DefaultResourceManager implements ResourceManager {
 
     @Override
     public Collection<ManagedResource> resources() {
-        return snapshot();
+        return List.copyOf(snapshot());   // 契约承诺只读视图
     }
 
     @Override
