@@ -22,8 +22,17 @@ MetaPool 使用 `io.github.roseri66` 作为 groupId（GitHub 用户名反向域�
 ## 发布
 
 ```bash
-# 0. 确认 JAVA_HOME 指向 JDK 17（本机默认可能是 JDK 8，见 RULES 台账 P-03）
-export JAVA_HOME='/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1'
+# 0. 确认 JAVA_HOME 指向 JDK 17。
+#    本机用户级+机器级 JAVA_HOME 都是 JDK 8，**每个新终端都要重设**，否则报
+#    「无效的目标发行版: 17」（RULES 台账 P-03，2026-07-26 又踩了一次）。
+#
+#    PowerShell（本机默认终端）：
+$env:JAVA_HOME = "C:\Program Files\ojdkbuild\java-17-openjdk-17.0.3.0.6-1"
+#    Git Bash：
+#    export JAVA_HOME='/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1'
+#
+#    先验一句，必须显示 17.x 才继续：
+mvn -v
 
 # 1. 去掉 -SNAPSHOT，定版（如 2.0.1）
 #    注意：不要用 mvn versions:set —— 本机插件解析会挂住（P-04），用 sed 直接替换

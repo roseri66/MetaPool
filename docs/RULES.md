@@ -100,9 +100,14 @@
 
 ### P-03 JAVA_HOME 默认指向 JDK 8，报「无效的目标发行版: 17」
 - **现象**：`mvn` 构建/deploy 直接失败。
-- **原因**：机器上同时装了 `C:\Program Files\Java\jdk-1.8`（8）和 `C:\Program Files\ojdkbuild\java-17-...`（17），默认 `JAVA_HOME` 是前者。
-- **修法**：构建前 `set JAVA_HOME=<JDK17 路径>`；deploy 前务必先确认。
-- **日期**：2026-07
+- **原因**：机器上同时装了 `C:\Program Files\Java\jdk-1.8`（8）和 `C:\Program Files\ojdkbuild\java-17-...`（17），**用户级与机器级 `JAVA_HOME` 都是前者**，所以每开一个新终端都是 JDK 8。
+- **修法**：构建前设 `JAVA_HOME` 指向 JDK 17；deploy 前务必先 `mvn -v` 确认显示 `Java version: 17.x`。
+  - PowerShell：`$env:JAVA_HOME = "C:\Program Files\ojdkbuild\java-17-openjdk-17.0.3.0.6-1"`
+  - Git Bash：`export JAVA_HOME='/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1'`
+- **⚠️ 2026-07-26 复发**：AI 侧每条命令都显式带了 JAVA_HOME 所以一路绿，人在自己终端里跑 `mvn -Prelease clean deploy` 就炸。两个教训：
+  ① `PUBLISHING.md` 原先只给了 bash 的 `export` 形式，而本机默认终端是 PowerShell —— **文档给命令必须匹配实际用的 shell**，已补两种形式；
+  ② 「构建前记得设环境变量」是纯手工约定，且失败信息（「无效的目标发行版: 17」）完全不提 JDK 版本，靠人记不住。**根治办法是让构建自己检查并给出可读报错**（maven-enforcer-plugin 的 `requireJavaVersion`），待办。
+- **日期**：2026-07（2026-07-26 复发并加强）
 
 ### P-04 `mvn versions:set` 在这台机器上会挂住
 - **现象**：改版本号命令长时间无输出（插件解析极慢）。
