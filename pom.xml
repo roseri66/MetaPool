@@ -57,11 +57,14 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- 框架版本锁定 -->
+        <!--
+            框架版本锁定。
+            注意：不要在这里钉 micrometer 版本 —— micrometer-core 由 spring-boot-dependencies 管，
+            单独钉 micrometer-registry-prometheus 会造成各 micrometer 模块版本错配（曾 core 1.14.4
+            对 registry 1.14.5），而 Micrometer 要求同版本。见坑 P-16。
+        -->
         <spring-boot.version>3.4.3</spring-boot.version>
-        <micrometer.version>1.14.5</micrometer.version>
         <bucket4j.version>8.9.0</bucket4j.version>
-        <lettuce.version>6.3.2.RELEASE</lettuce.version>
         <postgresql-driver.version>42.7.5</postgresql-driver.version>
         <testcontainers.version>1.20.6</testcontainers.version>
 
@@ -70,10 +73,6 @@
         <mockito.version>5.14.2</mockito.version>
         <jmh.version>1.37</jmh.version>
 
-        <!-- V1.1 对比基准依赖 (test scope only) -->
-        <commons-pool2.version>2.12.0</commons-pool2.version>
-        <guava.version>33.0.0-jre</guava.version>
-        <redisson.version>3.27.0</redisson.version>
         <hikaricp.version>5.1.0</hikaricp.version>
         <h2.version>2.2.224</h2.version>
 
@@ -94,25 +93,13 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Micrometer -->
-            <dependency>
-                <groupId>io.micrometer</groupId>
-                <artifactId>micrometer-registry-prometheus</artifactId>
-                <version>${micrometer.version}</version>
-            </dependency>
+            <!-- micrometer-core / micrometer-registry-prometheus 版本全部由上面的 spring-boot-dependencies 统一管理 -->
 
             <!-- Bucket4j：metapool-adapter-bucket4j 的编译期依赖 -->
             <dependency>
                 <groupId>com.bucket4j</groupId>
                 <artifactId>bucket4j-core</artifactId>
                 <version>${bucket4j.version}</version>
-            </dependency>
-
-            <!-- Lettuce -->
-            <dependency>
-                <groupId>io.lettuce</groupId>
-                <artifactId>lettuce-core</artifactId>
-                <version>${lettuce.version}</version>
             </dependency>
 
             <!-- PostgreSQL JDBC Driver -->
@@ -160,35 +147,13 @@
                 <scope>test</scope>
             </dependency>
 
-            <!-- V1.1 对比基准依赖 (test scope only) -->
-            <!-- SPEC-V11-05: Commons Pool2 -->
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-pool2</artifactId>
-                <version>${commons-pool2.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <!-- SPEC-V11-06: Guava RateLimiter -->
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${guava.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <!-- SPEC-V11-07: Redisson -->
-            <dependency>
-                <groupId>org.redisson</groupId>
-                <artifactId>redisson</artifactId>
-                <version>${redisson.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <!-- HikariCP：2.0 起作为 metapool-adapter-hikari 的编译期依赖（原 V1.1 仅用于对比基准） -->
+            <!-- HikariCP：metapool-adapter-hikari 的编译期依赖 -->
             <dependency>
                 <groupId>com.zaxxer</groupId>
                 <artifactId>HikariCP</artifactId>
                 <version>${hikaricp.version}</version>
             </dependency>
-            <!-- SPEC-V11-08/11: H2 for fair DB comparison -->
+            <!-- H2：测试与 examples/benchmark 的内存库 -->
             <dependency>
                 <groupId>com.h2database</groupId>
                 <artifactId>h2</artifactId>
