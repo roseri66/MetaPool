@@ -91,18 +91,46 @@ public final class DefaultResourceManager implements ResourceManager {
 
     @Override
     public void start() {
-        for (ManagedResource r : snapshot()) {
-            r.start();
+        List<ManagedResource> all = snapshot();
+        List<ManagedResource> started = new ArrayList<>(all.size());
+        try {
+            for (ManagedResource r : all) {
+                r.start();
+                started.add(r);
+            }
+        } catch (RuntimeException e) {
+            // fail-fast 也必须 fail-clean：已启动的资源要逆序回滚，否则它们的线程/连接会泄漏到
+            // JVM 结束 —— Spring 场景下 @Bean 方法抛异常，容器根本拿不到 bean，
+            // destroyMethod="close" 永不执行，没有任何人再有机会关掉它们（坑 P-11）。
+            rollback(started, e);
+            throw e;
         }
-        log.info("[MetaPool] control plane started, {} resource(s)", resources.size());
+        log.info("[MetaPool] control plane started, {} resource(s)", started.size());
+    }
+
+    /** 启动失败时逆序释放已启动资源。此刻还没有业务在用，故不等 graceful，直接立即释放。 */
+    private void rollback(List<ManagedResource> started, RuntimeException failure) {
+        log.error("[MetaPool] start failed, rolling back {} already-started resource(s): {}",
+                started.size(), failure.getMessage());
+        for (int i = started.size() - 1; i >= 0; i--) {
+            ManagedResource r = started.get(i);
+            try {
+                r.stop(Duration.ZERO);
+            } catch (RuntimeException suppressed) {
+                failure.addSuppressed(suppressed);
+                log.warn("[MetaPool] rollback: error stopping '{}': {}",
+                        r.name(), suppressed.getMessage());
+            }
+        }
     }
 
     @Override
     public void bindMetrics(MeterRegistry registry) {
-        for (ManagedResource r : snapshot()) {
+        List<ManagedResource> all = snapshot();
+        for (ManagedResource r : all) {
             r.bindTo(registry);
         }
-        log.info("[MetaPool] metrics bound for {} resource(s)", resources.size());
+        log.info("[MetaPool] metrics bound for {} resource(s)", all.size());
     }
 
     @Override

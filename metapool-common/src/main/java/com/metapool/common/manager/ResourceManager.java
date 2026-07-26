@@ -49,7 +49,12 @@ public interface ResourceManager extends AutoCloseable {
     /** 所有已注册资源的只读视图。 */
     Collection<ManagedResource> resources();
 
-    /** 按注册顺序启动全部资源。已启动的资源被幂等跳过。 */
+    /**
+     * 按注册顺序启动全部资源。已启动的资源被幂等跳过。
+     *
+     * <p>任一资源启动失败时，本方法把<b>已启动的资源逆序停掉</b>后再抛出原异常 —— fail-fast 也要
+     * fail-clean，不能留下一堆没人负责关闭的活池。
+     */
     void start();
 
     /** 把全部资源的指标绑定到给定 registry（统一 tag）。 */
