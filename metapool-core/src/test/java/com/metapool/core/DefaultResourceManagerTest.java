@@ -1,5 +1,6 @@
 package com.metapool.core;
 
+import com.metapool.common.exception.ErrorCode;
 import com.metapool.common.exception.MetaPoolException;
 import com.metapool.common.manager.ResourceManager;
 import com.metapool.common.resource.ManagedResource;
@@ -73,6 +74,35 @@ class DefaultResourceManagerTest {
 
         assertEquals(List.of("start:r1", "start:r2", "start:r3",
                 "stop:r3", "stop:r2", "stop:r1"), events);
+    }
+
+    /**
+     * 坑 P-11：start() 中途失败若不回滚，已启动的资源就永远没人关 —— Spring 场景下 @Bean 抛异常，
+     * 容器拿不到 bean，destroyMethod="close" 永不执行，底层池的线程/连接泄漏到 JVM 结束。
+     */
+    @Test
+    void start_failure_rollsBackAlreadyStartedResources_inReverse() {
+        List<String> events = new ArrayList<>();
+        ResourceManager mgr = new DefaultResourceManager(Duration.ZERO);
+        mgr.register(new FakeResource("r1", events));
+        mgr.register(new FakeResource("r2", events));
+        mgr.register(new FailingResource("boom", events));
+        mgr.register(new FakeResource("never", events));
+
+        MetaPoolException thrown = assertThrows(MetaPoolException.class, mgr::start);
+        assertTrue(thrown.getMessage().contains("boom"));
+
+        // r1/r2 启动过 → 必须被逆序停掉；boom 自身没启动成功；never 根本没轮到
+        assertEquals(List.of("start:r1", "start:r2", "start:boom", "stop:r2", "stop:r1"), events);
+    }
+
+    /** 启动即失败的资源，用于验证回滚。 */
+    static final class FailingResource extends FakeResource {
+        FailingResource(String name, List<String> events) { super(name, events); }
+        @Override public void start() {
+            events.add("start:" + name);
+            throw new MetaPoolException(ErrorCode.INTERNAL, "cannot start '" + name + "'");
+        }
     }
 
     @Test

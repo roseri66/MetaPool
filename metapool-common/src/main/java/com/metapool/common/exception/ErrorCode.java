@@ -22,7 +22,10 @@ public enum ErrorCode {
     RESOURCE_NOT_FOUND("POOL-003", "Managed resource not found"),
 
     /** 动态调参被拒绝（参数不在白名单或校验失败）。 */
-    TUNE_REJECTED("POOL-004", "Tune request rejected");
+    TUNE_REJECTED("POOL-004", "Tune request rejected"),
+
+    /** 资源正在优雅停机，不再接受新的使用请求。 */
+    SHUTTING_DOWN("POOL-005", "Resource is shutting down");
 
     private final String code;
     private final String defaultMessage;

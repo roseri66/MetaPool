@@ -133,7 +133,12 @@ GET  /actuator/metapool
 POST /actuator/metapool/main   {"key": "maximum-pool-size", "value": "40"}
 ```
 
-底层：HikariCP 走 `HikariConfigMXBean`，Bucket4j 走 `replaceConfiguration`——MetaPool 统一成一个 `apply(patch)` 门面，仅允许白名单参数，带审计。
+底层：HikariCP 走 `HikariConfigMXBean`，Bucket4j 走 `replaceConfiguration`——MetaPool 统一成一个 `apply(patch)` 门面，仅允许白名单参数，带审计。白名单里写了不支持的 key 会在**启动时**就报错，而不是等到调参时才拒。
+
+> ⚠️ **生产安全**：`POST /actuator/metapool/{name}` 是**变更接口**。Actuator 端点默认不带认证，
+> 请务必用 Spring Security 保护 management 端口，或只把它绑到内网管理端口
+> （`management.server.port` + `management.server.address`）。示例应用为了开箱即跑没有加认证，
+> **不要直接照搬到生产**。
 
 ### 本地起监控栈（Prometheus + Grafana）
 

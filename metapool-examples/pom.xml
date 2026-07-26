@@ -71,6 +71,15 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
+                <executions>
+                    <!--
+                        本项目不以 spring-boot-starter-parent 为父 pom，repackage 不会自动绑定，
+                        必须显式声明 —— 否则 mvn package 只产出瘦 jar，java -jar 跑不起来。
+                    -->
+                    <execution>
+                        <goals><goal>repackage</goal></goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

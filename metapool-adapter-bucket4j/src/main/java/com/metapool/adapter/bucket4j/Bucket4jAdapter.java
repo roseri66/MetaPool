@@ -1,6 +1,7 @@
 package com.metapool.adapter.bucket4j;
 
 import com.metapool.common.capability.RateLimiter;
+import com.metapool.common.exception.ErrorCode;
 import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.exception.MetaPoolException;
 import com.metapool.common.resource.ManagedResource;
@@ -12,7 +13,6 @@ import com.metapool.common.stats.TuneResult;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
-import io.github.bucket4j.Refill;
 import io.github.bucket4j.TokensInheritanceStrategy;
 import io.micrometer.core.instrument.FunctionCounter;
 import io.micrometer.core.instrument.Gauge;
@@ -61,6 +61,15 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
     /** 内置可热调参数（kebab-case，与 YAML/tunable 声明一致）。 */
     static final String KEY_LIMIT_FOR_PERIOD = "limit-for-period";
 
+    /**
+     * 本适配器能够热调的全部参数。配置里声明的 {@code tunable} 白名单必须是它的子集 ——
+     * 否则构建期即失败（fail-fast，RULES §3.3），不留到运维真去调参时才报（见坑 P-13）。
+     *
+     * <p>{@code refill-period} 不在其中：改补充周期等于换一条 Bandwidth 的时间基准，
+     * 语义上是重建限流器而非调参，故只允许重启时经配置变更。
+     */
+    static final Set<String> SUPPORTED_TUNABLE_KEYS = Set.of(KEY_LIMIT_FOR_PERIOD);
+
     private final String name;
     private final Duration refillPeriod;
     private final Set<String> tunableKeys;
@@ -71,7 +80,6 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     private final AtomicLong totalAcquired = new AtomicLong();
     private final AtomicLong totalRejected = new AtomicLong();
-    private volatile boolean metricsBound;
 
     Bucket4jAdapter(String name, long limitForPeriod, Duration refillPeriod, Set<String> tunableKeys) {
         this.name = Objects.requireNonNull(name, "name must not be null");
@@ -83,7 +91,19 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
             throw new MetaPoolConfigException("refill-period must be positive, got " + refillPeriod);
         }
         this.limitForPeriod = limitForPeriod;
-        this.tunableKeys = Set.copyOf(tunableKeys);
+        this.tunableKeys = validateTunableKeys(name, tunableKeys);
+    }
+
+    /** 启动前就拒掉拼错/不支持的 tunable key，而不是等到调参时返回 rejected。 */
+    private static Set<String> validateTunableKeys(String name, Set<String> keys) {
+        Objects.requireNonNull(keys, "tunableKeys must not be null");
+        Set<String> unsupported = new LinkedHashSet<>(keys);
+        unsupported.removeAll(SUPPORTED_TUNABLE_KEYS);
+        if (!unsupported.isEmpty()) {
+            throw new MetaPoolConfigException("rate-limiter '" + name + "' declares unsupported tunable key(s) "
+                    + unsupported + "; supported: " + SUPPORTED_TUNABLE_KEYS);
+        }
+        return Set.copyOf(keys);
     }
 
     public static Builder builder() {
@@ -115,7 +135,10 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
     }
 
     @Override
-    public void stop(Duration graceful) {
+    public synchronized void stop(Duration graceful) {
+        if (bucket == null) {
+            return; // 幂等
+        }
         // 限流器无在用资源，无需 drain；直接停用
         bucket = null;
         log.info("[MetaPool] rate-limiter '{}' stopped", name);
@@ -126,17 +149,15 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
         return bucket != null ? HealthStatus.up() : HealthStatus.down("not started");
     }
 
+    /** greedy 补充：额度在周期内平滑释放，而非到点一次性放满。 */
     private Bandwidth bandwidth(long tokens) {
-        return Bandwidth.classic(tokens, Refill.greedy(tokens, refillPeriod));
+        return Bandwidth.builder().capacity(tokens).refillGreedy(tokens, refillPeriod).build();
     }
 
     // ==================== MetricsSource ====================
 
     @Override
-    public synchronized void bindTo(MeterRegistry registry) {
-        if (metricsBound) {
-            return;
-        }
+    public void bindTo(MeterRegistry registry) {
         Tags tags = Tags.of("metapool.resource", name, "metapool.type", type());
         Gauge.builder("metapool.ratelimiter.available.tokens", this, Bucket4jAdapter::sampleAvailable)
                 .tags(tags).register(registry);
@@ -144,7 +165,6 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
                 .tags(tags).register(registry);
         FunctionCounter.builder("metapool.ratelimiter.rejected.total", totalRejected, AtomicLong::doubleValue)
                 .tags(tags).register(registry);
-        metricsBound = true;
     }
 
     private double sampleAvailable() {
@@ -156,6 +176,7 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     @Override
     public boolean tryAcquire(int permits) {
+        requirePositivePermits(permits);
         boolean ok = requireStarted().tryConsume(permits);
         record(ok);
         return ok;
@@ -163,9 +184,19 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     @Override
     public boolean tryAcquire(int permits, Duration timeout) throws InterruptedException {
+        requirePositivePermits(permits);
+        Objects.requireNonNull(timeout, "timeout must not be null");
         boolean ok = requireStarted().asBlocking().tryConsume(permits, timeout);
         record(ok);
         return ok;
+    }
+
+    /** 前置校验，避免 Bucket4j 抛出的裸 IllegalArgumentException 逃出 MetaPoolException 契约（§3.2）。 */
+    private void requirePositivePermits(int permits) {
+        if (permits <= 0) {
+            throw new MetaPoolException(ErrorCode.CONFIG_INVALID,
+                    "rate-limiter '" + name + "': permits must be positive, got " + permits);
+        }
     }
 
     @Override
@@ -188,6 +219,7 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
 
     @Override
     public TuneResult apply(Map<String, Object> patch) {
+        Objects.requireNonNull(patch, "patch must not be null");
         Bucket b = this.bucket;
         Map<String, String> rejected = new LinkedHashMap<>();
         Set<String> applied = new LinkedHashSet<>();
@@ -250,7 +282,7 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
         private String name;
         private long limitForPeriod = -1;
         private Duration refillPeriod = Duration.ofSeconds(1);
-        private Set<String> tunableKeys = Set.of(KEY_LIMIT_FOR_PERIOD);
+        private Set<String> tunableKeys = SUPPORTED_TUNABLE_KEYS;
 
         private Builder() {
         }

@@ -15,6 +15,9 @@ metapool:
       refill-period: 1s
       tunable: [limit-for-period]
 
+# 注意：为了 demo 开箱即跑，这里把 metapool 端点直接暴露且未加认证。
+# metapool 端点含 @WriteOperation（热调参），生产环境务必用 Spring Security 保护
+# 或绑到内网管理端口（management.server.port / address）—— 不要照搬本文件。
 management:
   endpoints:
     web:

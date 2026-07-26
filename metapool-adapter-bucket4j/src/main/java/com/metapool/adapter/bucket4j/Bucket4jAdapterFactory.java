@@ -40,11 +40,11 @@ public final class Bucket4jAdapterFactory implements ResourceAdapterFactory {
             throw new MetaPoolConfigException(
                     "rate-limiter '" + definition.name() + "' requires 'limit-for-period'");
         }
-        long limit = (limitRaw instanceof Number n) ? n.longValue() : Long.parseLong(String.valueOf(limitRaw));
+        long limit = parseLimit(definition.name(), limitRaw);
         Duration refill = parseDuration(props.getOrDefault("refill-period", "1s"));
 
         Set<String> tunable = definition.tunableKeys().isEmpty()
-                ? Set.of(Bucket4jAdapter.KEY_LIMIT_FOR_PERIOD)
+                ? Bucket4jAdapter.SUPPORTED_TUNABLE_KEYS
                 : definition.tunableKeys();
 
         return Bucket4jAdapter.builder()
@@ -53,6 +53,19 @@ public final class Bucket4jAdapterFactory implements ResourceAdapterFactory {
                 .refillPeriod(refill)
                 .tunable(tunable)
                 .build();
+    }
+
+    /** 非法 {@code limit-for-period} 必须报 {@link MetaPoolConfigException}，不能漏出裸 NumberFormatException（§3.2）。 */
+    private static long parseLimit(String name, Object raw) {
+        if (raw instanceof Number n) {
+            return n.longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new MetaPoolConfigException("rate-limiter '" + name
+                    + "' has invalid 'limit-for-period': " + raw, e);
+        }
     }
 
     /** 支持 {@code "1s"} / {@code "500ms"} / {@code "2m"} / 纯毫秒数字 / ISO-8601（{@code PT1S}）。 */

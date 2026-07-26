@@ -31,12 +31,18 @@ class ExampleApplicationTest {
         assertTrue(metaPool.find("order-api").isPresent());
     }
 
+    /**
+     * 桶容量 5/s、greedy 补充（每 200ms 回 1 个令牌）。因此"放行数恰好等于 5"只在整个循环跑完于
+     * 一个补充周期内时成立 —— 机器慢或 CI 有负载时会多放行 1~2 个。断言写成区间而非精确值，
+     * 既守住"限流真实生效"这个被测行为，又不把测试绑死在时序上（见坑 P-17）。
+     */
     @Test
     void rateLimit_kicksIn_afterCapacity() throws Exception {
+        int capacity = 5;
+        int requests = 10;
         int ok = 0;
         int limited = 0;
-        // 桶容量 5/s，10 次快速请求应出现限流
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < requests; i++) {
             int status = mockMvc.perform(post("/orders/order-" + i))
                     .andReturn().getResponse().getStatus();
             if (status == 200) {
@@ -45,7 +51,9 @@ class ExampleApplicationTest {
                 limited++;
             }
         }
-        assertEquals(5, ok, "应有 5 个请求在限额内放行");
+        assertTrue(ok >= capacity, "至少应放行一个满桶的量，实得 " + ok);
+        assertTrue(ok < requests, "不应全部放行，否则限流没生效，实得 " + ok);
+        assertEquals(requests, ok + limited, "每个请求都应落在 200 或 429，实得 ok=" + ok + " limited=" + limited);
         assertTrue(limited > 0, "超出限额的请求应被限流（429）");
     }
 }

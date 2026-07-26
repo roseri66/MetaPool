@@ -1,6 +1,7 @@
 package com.metapool.adapter.bucket4j;
 
 import com.metapool.common.capability.Pool;
+import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.spi.ResourceDefinition;
 import com.metapool.common.stats.HealthStatus;
@@ -8,6 +9,7 @@ import com.metapool.common.stats.TuneResult;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +17,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -95,7 +98,7 @@ class Bucket4jAdapterTest {
 
         TuneResult ok = rl.apply(Map.of("limit-for-period", 10));
         assertTrue(ok.success());
-        // 提高上限后（PROPORTIONALLY 继承），应重新有额度
+        // 提高上限后（ADDITIVE 继承：增量额度立即授予当前桶），应重新有额度
         assertTrue(rl.tryAcquire(1));
 
         TuneResult rejected = rl.apply(Map.of("refill-period", "5s"));
@@ -117,6 +120,50 @@ class Bucket4jAdapterTest {
         resource.start();
         assertEquals(HealthStatus.Status.UP, resource.health().status());
         resource.stop(Duration.ZERO);
+    }
+
+    /**
+     * RULES §3.5 要求生命周期方法 start/stop 都 synchronized。start() 一直有，stop() 曾漏（坑 P-09）：
+     * 漏了会丢 stop —— stop() 在 start() 的「bucket != null」检查与赋值之间把字段置空，
+     * start() 随后赋上新桶，于是 stop() 已返回而限流器还活着继续放行流量。
+     *
+     * <p>竞态本身不可确定性复现，因此这里直接守护规则所述的不变量：方法必须带 synchronized 修饰。
+     */
+    @Test
+    void lifecycleMethods_areSynchronized_perRules() throws Exception {
+        assertTrue(Modifier.isSynchronized(
+                        Bucket4jAdapter.class.getMethod("start").getModifiers()),
+                "start() 必须 synchronized（RULES §3.5）");
+        assertTrue(Modifier.isSynchronized(
+                        Bucket4jAdapter.class.getMethod("stop", Duration.class).getModifiers()),
+                "stop() 必须 synchronized（RULES §3.5）—— 否则与 start() 竞争会丢 stop");
+    }
+
+    @Test
+    void stop_isIdempotent_andSafeWhenNeverStarted() {
+        Bucket4jAdapter rl = Bucket4jAdapter.builder()
+                .named("api").limitForPeriod(1).refillPeriod(Duration.ofMinutes(1)).build();
+        rl.stop(Duration.ZERO);   // 从未启动
+        assertEquals(HealthStatus.Status.DOWN, rl.health().status());
+
+        rl.start();
+        rl.stop(Duration.ZERO);
+        rl.stop(Duration.ZERO);   // 重复停机
+        assertEquals(HealthStatus.Status.DOWN, rl.health().status());
+    }
+
+    /** 坑 P-13：tunable 白名单里不支持的 key 必须构建期就报，而不是等运维调参时才返回 rejected。 */
+    @Test
+    void unsupportedTunableKey_failsFastAtBuildTime() {
+        MetaPoolConfigException e = assertThrows(MetaPoolConfigException.class,
+                () -> Bucket4jAdapter.builder().named("api").limitForPeriod(10)
+                        .tunable(Set.of("refill-period"))   // 不支持热调
+                        .build());
+        assertTrue(e.getMessage().contains("refill-period"), e.getMessage());
+
+        var def = new ResourceDefinition("order-api", "rate-limiter",
+                Map.of("limit-for-period", 100), Set.of("limit-per-period"));  // 拼错
+        assertThrows(MetaPoolConfigException.class, () -> new Bucket4jAdapterFactory().create(def));
     }
 
     @Test
