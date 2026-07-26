@@ -115,7 +115,10 @@ public final class Bucket4jAdapter implements ManagedResource, RateLimiter, Tuna
     }
 
     @Override
-    public void stop(Duration graceful) {
+    public synchronized void stop(Duration graceful) {
+        if (bucket == null) {
+            return; // 幂等
+        }
         // 限流器无在用资源，无需 drain；直接停用
         bucket = null;
         log.info("[MetaPool] rate-limiter '{}' stopped", name);

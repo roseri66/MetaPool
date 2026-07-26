@@ -8,6 +8,7 @@ import com.metapool.common.stats.TuneResult;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
@@ -117,6 +118,36 @@ class Bucket4jAdapterTest {
         resource.start();
         assertEquals(HealthStatus.Status.UP, resource.health().status());
         resource.stop(Duration.ZERO);
+    }
+
+    /**
+     * RULES §3.5 要求生命周期方法 start/stop 都 synchronized。start() 一直有，stop() 曾漏（坑 P-09）：
+     * 漏了会丢 stop —— stop() 在 start() 的「bucket != null」检查与赋值之间把字段置空，
+     * start() 随后赋上新桶，于是 stop() 已返回而限流器还活着继续放行流量。
+     *
+     * <p>竞态本身不可确定性复现，因此这里直接守护规则所述的不变量：方法必须带 synchronized 修饰。
+     */
+    @Test
+    void lifecycleMethods_areSynchronized_perRules() throws Exception {
+        assertTrue(Modifier.isSynchronized(
+                        Bucket4jAdapter.class.getMethod("start").getModifiers()),
+                "start() 必须 synchronized（RULES §3.5）");
+        assertTrue(Modifier.isSynchronized(
+                        Bucket4jAdapter.class.getMethod("stop", Duration.class).getModifiers()),
+                "stop() 必须 synchronized（RULES §3.5）—— 否则与 start() 竞争会丢 stop");
+    }
+
+    @Test
+    void stop_isIdempotent_andSafeWhenNeverStarted() {
+        Bucket4jAdapter rl = Bucket4jAdapter.builder()
+                .named("api").limitForPeriod(1).refillPeriod(Duration.ofMinutes(1)).build();
+        rl.stop(Duration.ZERO);   // 从未启动
+        assertEquals(HealthStatus.Status.DOWN, rl.health().status());
+
+        rl.start();
+        rl.stop(Duration.ZERO);
+        rl.stop(Duration.ZERO);   // 重复停机
+        assertEquals(HealthStatus.Status.DOWN, rl.health().status());
     }
 
     @Test
