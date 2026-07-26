@@ -40,7 +40,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>{@link com.metapool.common.resource.ManagedLifecycle} — start 建池；stop 先 drain 在用连接再关闭</li>
  *   <li>{@link com.metapool.common.resource.MetricsSource} — 注册 {@code metapool.datasource.*} 网关指标，
  *       读 {@link HikariPoolMXBean}，打统一 tag，<b>与 start 顺序无关</b></li>
- *   <li>{@link Pool}{@code <Connection>} — borrow=getConnection，release=connection.close()</li>
+ *   <li>{@link Pool}{@code <Connection>} — borrow=getConnection，release=connection.close()。
+ *       两条路径都可用，但只有走 {@link Pool} 能力的流量会计入 {@link #poolStats()} 的累计计数
+ *       （原因见 {@link #poolStats()}）</li>
  *   <li>{@link Tunable} — 经 {@code HikariConfigMXBean} 热调 {@code maximum-pool-size} / {@code connection-timeout}</li>
  * </ul>
  *
@@ -50,7 +52,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * cfg.setJdbcUrl("jdbc:postgresql://localhost:5432/app");
  * HikariAdapter ds = HikariAdapter.from(cfg).named("main").build();
  * ds.start();
+ *
+ * // 原生用法：直通 JDBC 惯例，不计入 poolStats 累计计数
  * try (Connection c = ds.getConnection()) { ... }
+ *
+ * // Pool 能力用法：计入 poolStats().totalBorrowed()/totalReleased()
+ * Connection c = ds.borrow();
+ * try { ... } finally { ds.release(c); }
+ *
  * ds.stop(Duration.ofSeconds(5));
  * }</pre>
  *
@@ -70,6 +79,12 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
     static final String KEY_MAX_POOL_SIZE = "maximum-pool-size";
     static final String KEY_CONNECTION_TIMEOUT = "connection-timeout";
 
+    /**
+     * 本适配器能够热调的全部参数。配置里声明的 {@code tunable} 白名单必须是它的子集 ——
+     * 否则构建期即失败（fail-fast，RULES §3.3），不留到运维真去调参时才报（见坑 P-13）。
+     */
+    static final Set<String> SUPPORTED_TUNABLE_KEYS = Set.of(KEY_MAX_POOL_SIZE, KEY_CONNECTION_TIMEOUT);
+
     private final String name;
     private final HikariConfig config;
     private final Set<String> tunableKeys;
@@ -84,8 +99,20 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
     HikariAdapter(String name, HikariConfig config, Set<String> tunableKeys) {
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.config = Objects.requireNonNull(config, "config must not be null");
-        this.tunableKeys = Set.copyOf(tunableKeys);
+        this.tunableKeys = validateTunableKeys(name, tunableKeys);
         this.config.setPoolName(name);
+    }
+
+    /** 启动前就拒掉拼错/不支持的 tunable key，而不是等到调参时返回 rejected。 */
+    private static Set<String> validateTunableKeys(String name, Set<String> keys) {
+        Objects.requireNonNull(keys, "tunableKeys must not be null");
+        Set<String> unsupported = new java.util.LinkedHashSet<>(keys);
+        unsupported.removeAll(SUPPORTED_TUNABLE_KEYS);
+        if (!unsupported.isEmpty()) {
+            throw new MetaPoolConfigException("datasource '" + name + "' declares unsupported tunable key(s) "
+                    + unsupported + "; supported: " + SUPPORTED_TUNABLE_KEYS);
+        }
+        return Set.copyOf(keys);
     }
 
     public static Builder from(HikariConfig config) {
@@ -212,7 +239,9 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
 
     @Override
     public Connection borrow() throws InterruptedException {
-        return doGetConnection();
+        Connection c = doGetConnection();
+        totalBorrowed.incrementAndGet();
+        return c;
     }
 
     /**
@@ -224,10 +253,19 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
      */
     @Override
     public Connection borrow(Duration timeout) throws InterruptedException, PoolExhaustedException {
-        return doGetConnection();
+        Connection c = doGetConnection();
+        totalBorrowed.incrementAndGet();
+        return c;
     }
 
-    /** 供 Pool 能力与原生访问共用。 */
+    /**
+     * 原生访问入口 —— 直通 {@link HikariDataSource#getConnection()}，用完按 JDBC 惯例
+     * {@code close()} 归还。
+     *
+     * <p><b>不计入</b> {@link #poolStats()} 的累计计数：归还走的是 {@code Connection.close()}，
+     * 适配器无从观测，若在此计 borrow 就会出现「借出 1000、归还 0」的失真（见坑 P-12）。
+     * 需要瞬时口径请看 {@code metapool.datasource.connections.*} 指标（由 HikariCP 自身统计）。
+     */
     public Connection getConnection() {
         return doGetConnection();
     }
@@ -235,9 +273,7 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
     private Connection doGetConnection() {
         HikariDataSource ds = requireStarted();
         try {
-            Connection c = ds.getConnection();
-            totalBorrowed.incrementAndGet();
-            return c;
+            return ds.getConnection();
         } catch (SQLTransientConnectionException e) {
             throw new PoolExhaustedException(
                     "datasource '" + name + "' exhausted (connectionTimeout exceeded)", e);
@@ -261,6 +297,15 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>计数口径</b>：{@code totalBorrowed} / {@code totalReleased} 只统计经 {@link Pool} 能力
+     * （{@link #borrow()} / {@link #release(Connection)}）的流量，因此两者可比、可对账。经
+     * {@link #getConnection()} 的原生流量不计入 —— 它靠 {@code Connection.close()} 归还，
+     * 适配器观测不到，计了就只涨 borrowed 不涨 released（见坑 P-12）。
+     * {@code active}/{@code idle}/{@code pending} 是全量瞬时值，两种用法都涵盖。
+     */
     @Override
     public PoolStats poolStats() {
         HikariDataSource ds = this.dataSource;
@@ -352,7 +397,7 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
     public static final class Builder {
         private final HikariConfig config;
         private String name;
-        private Set<String> tunableKeys = Set.of(KEY_MAX_POOL_SIZE, KEY_CONNECTION_TIMEOUT);
+        private Set<String> tunableKeys = SUPPORTED_TUNABLE_KEYS;
 
         private Builder(HikariConfig config) {
             this.config = Objects.requireNonNull(config, "config must not be null");

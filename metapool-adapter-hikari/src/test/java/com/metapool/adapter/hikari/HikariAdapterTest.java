@@ -1,5 +1,6 @@
 package com.metapool.adapter.hikari;
 
+import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.stats.HealthStatus;
 import com.metapool.common.stats.PoolStats;
 import com.metapool.common.stats.TuneResult;
@@ -18,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -137,6 +139,52 @@ class HikariAdapterTest {
         resource.start();
         assertEquals(HealthStatus.Status.UP, resource.health().status());
         resource.stop(Duration.ZERO);
+    }
+
+    /**
+     * 坑 P-12：原生 {@code getConnection()} 曾也计 totalBorrowed，但归还走 {@code Connection.close()}
+     * 适配器观测不到 → 出现「借出 N、归还 0」的失真。现在累计计数只统计 Pool 能力路径，两边可对账。
+     */
+    @Test
+    void nativeGetConnection_doesNotSkewCumulativeCounters() throws Exception {
+        HikariAdapter ds = HikariAdapter.from(h2Config()).named("main").build();
+        ds.start();
+
+        for (int i = 0; i < 3; i++) {
+            try (Connection c = ds.getConnection()) {
+                assertNotNull(c);
+            }
+        }
+        PoolStats afterNative = ds.poolStats();
+        assertEquals(0, afterNative.totalBorrowed(), "原生路径不应计入 totalBorrowed");
+        assertEquals(afterNative.totalBorrowed(), afterNative.totalReleased(),
+                "累计计数必须自洽：不能只涨 borrowed 不涨 released");
+
+        // Pool 能力路径照常计数，且借还对称
+        ds.release(ds.borrow());
+        ds.release(ds.borrow());
+        PoolStats afterPool = ds.poolStats();
+        assertEquals(2, afterPool.totalBorrowed());
+        assertEquals(2, afterPool.totalReleased());
+
+        ds.stop(Duration.ZERO);
+    }
+
+    /** 坑 P-13：tunable 白名单里拼错的 key 必须构建期就报，而不是等运维调参时才返回 rejected。 */
+    @Test
+    void unsupportedTunableKey_failsFastAtBuildTime() {
+        MetaPoolConfigException e = assertThrows(MetaPoolConfigException.class,
+                () -> HikariAdapter.from(h2Config()).named("main")
+                        .tunable(Set.of("maximum-poolsize"))   // 漏了连字符
+                        .build());
+        assertTrue(e.getMessage().contains("maximum-poolsize"), e.getMessage());
+
+        // 经 SPI/YAML 声明的同样错拼也要 fail-fast
+        var def = new com.metapool.common.spi.ResourceDefinition(
+                "main", "datasource",
+                Map.of("jdbc-url", "jdbc:h2:mem:mpTunableFF;DB_CLOSE_DELAY=-1", "username", "sa"),
+                Set.of("connection-timeout", "totally-bogus"));
+        assertThrows(MetaPoolConfigException.class, () -> new HikariAdapterFactory().create(def));
     }
 
     @Test
