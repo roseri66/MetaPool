@@ -1,0 +1,107 @@
+name: Release to Maven Central
+
+# 只允许手动触发 —— 路线图明确要求「不做全自动发布，避免误发」。
+# 不挂 v* 标签触发：标签是发布**结果**的记录，不该是发布的扳机。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要发布的版本号（如 2.1.0，不带 -SNAPSHOT）'
+        required: true
+        type: string
+      dry_run:
+        description: '演练模式：签名并打包，但不上传 Central（首次配好 Secrets 后请先用它验证）'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    # Linux 上跑：ubuntu runner 有 Docker，Testcontainers PG 用例会真实执行，
+    # 发布前等于多做了一次真数据库验证。
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate version input
+        run: |
+          V='${{ inputs.version }}'
+          if [[ ! "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::版本号必须形如 2.1.0，且不带 -SNAPSHOT，实得: $V"
+            exit 1
+          fi
+          echo "将发布版本: $V"
+
+      - name: Set up JDK 17 + GPG + Central credentials
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          # 生成 ~/.m2/settings.xml，其中 <server><id>central</id> 取下面两个环境变量
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
+          # 导入签名私钥；passphrase 通过 MAVEN_GPG_PASSPHRASE 环境变量传给 maven-gpg-plugin
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      # 用 sed 而非 versions:set —— 见 RULES 台账 P-04（本项目统一口径）
+      - name: Set release version
+        run: |
+          sed -i "s|<version>.*-SNAPSHOT</version>|<version>${{ inputs.version }}</version>|g" \
+            pom.xml metapool-*/pom.xml
+          if grep -rn SNAPSHOT pom.xml metapool-*/pom.xml; then
+            echo "::error::仍有 SNAPSHOT 残留"; exit 1
+          fi
+          mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout | tail -1
+
+      # 演练：完整跑 release profile（含 source/javadoc/gpg 签名），但不 deploy。
+      # 用来验证 Secrets 配对、GPG 能否非交互签名、javadoc 能否生成 —— 这三样是发布最常见的绊脚石。
+      - name: Dry run (build + sign, no upload)
+        if: ${{ inputs.dry_run }}
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: mvn -B --no-transfer-progress -Prelease clean verify -Dgpg.pinentryMode=loopback
+
+      - name: Show signed artifacts (dry run)
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "### 演练产物（.asc = 签名成功）" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find . -path ./target -prune -o \( -name '*.jar' -o -name '*.asc' \) -print \
+            | grep '/target/' | sort >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      # 真发布：上传到 Central。父 pom 的 central-publishing-maven-plugin 配了
+      # autoPublish=false，因此产物只是上传到 Deployments 待确认，仍需人到
+      # central.sonatype.com 点 Publish —— 这一层人工闸门是刻意保留的。
+      - name: Deploy to Maven Central (staged, needs manual Publish)
+        if: ${{ !inputs.dry_run }}
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_TOKEN_USER }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: mvn -B --no-transfer-progress -Prelease clean deploy -Dgpg.pinentryMode=loopback
+
+      - name: Next steps
+        if: ${{ !inputs.dry_run }}
+        run: |
+          {
+            echo "### ${{ inputs.version }} 已上传，尚未发布"
+            echo ""
+            echo "产物已 staged 到 Central，**还需人工确认**："
+            echo "1. 去 https://central.sonatype.com → Deployments → 点 **Publish**"
+            echo "2. 确认生效后打 tag 并建 Release："
+            echo '   ```'
+            echo "   git tag -a v${{ inputs.version }} -m \"MetaPool ${{ inputs.version }}\""
+            echo "   git push origin v${{ inputs.version }}"
+            echo '   ```'
+            echo "3. 把 \`main\` 推进到下一个 -SNAPSHOT（见 docs/PUBLISHING.md）"
+            echo ""
+            echo "> 本 workflow **不会**自动提交版本号变更、不会打 tag、不会点 Publish —— 均由人把关。"
+          } >> $GITHUB_STEP_SUMMARY

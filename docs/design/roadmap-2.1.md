@@ -16,11 +16,25 @@
 
 ## P0 — 该做（有明确价值，且是「作品集完整度」的短板）
 
-### 1. GitHub Actions CI
-- **做什么**：`push` / `pull_request` 触发 `mvn clean verify`（JDK 17，多 OS 可选）；`v*` 标签触发 `mvn -Prelease deploy`（用 Secrets 存 Central token + GPG）。接入 jacoco 覆盖率上报。
-- **为什么**：现在「全绿」只有本地证据。公开仓库有 CI 徽章 = 可信度显著提升，也防回归。**这是 2.0 唯一明显欠缺的工程基建。**
-- **前置**：无。GPG/token 走 GitHub Secrets，不落仓库。
-- **风险**：低。发布 job 建议手动触发（workflow_dispatch）而非全自动，避免误发。
+### 1. GitHub Actions CI ✅ 已完成（2026-07-26）
+
+- **构建 CI**（[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)）：`push(main)` / `pull_request` /
+  手动触发，matrix `ubuntu-latest` + `windows-latest` × JDK 17，跑 `mvn -B clean verify`；
+  失败上传 surefire 报告；同分支新 push 自动取消旧构建；纯文档改动不触发。
+  README 徽章已从**硬编码的假徽章**（`badge/build-passing`，链接指向 `.`）换成真实 workflow badge。
+- **实测收益不止「把本地结果搬上去」**：ubuntu runner 自带 Docker，因此
+  `HikariAdapterPostgresTest`（Testcontainers PostgreSQL）在 CI 上**真实执行**了 5.476s ——
+  该用例自写出来一直因本地无 Docker 而跳过，这是它第一次真正跑过。
+  首次运行结果：ubuntu **38 通过 / 0 跳过**，windows 37 通过 / 1 跳过（无 Docker，符合 §4.3 不阻塞构建）。
+- **发布 workflow**（[`.github/workflows/release.yml`](../../.github/workflows/release.yml)）：
+  按本节原定的「避免误发」原则，**只允许 `workflow_dispatch` 手动触发**，不挂 `v*` 标签触发
+  ——标签是发布**结果**的记录，不该当扳机。带 `dry_run` 输入且**默认为 true**：先演练（完整签名打包但不上传），
+  验证 Secrets/GPG/javadoc 都正常后再关掉演练真发。父 pom 的 `autoPublish=false` 保留了
+  「到 Central 门户人工点 Publish」这道闸门；workflow 也**不会**自动改版本提交、不会打 tag。
+  所需 Secrets 见 [`../PUBLISHING.md`](../PUBLISHING.md)。
+- **jacoco 覆盖率上报**：原计划的这一项**暂不做**。接 Codecov 之类要引入外部账号 + token，
+  与 §1.5「优先简单稳定、拒绝为显高级而加」冲突；覆盖率数字对本项目的可信度提升也远不如
+  「两个平台真实跑通 + PG 容器真实验证」。等真有需要（如多人协作看回归）再议。
 
 ### 2. 补齐能力接口：`DistributedLock` / `ManagedExecutor`
 - **做什么**：2.0 里为 YAGNI 只定义了 `Pool` / `RateLimiter`。要接入锁和线程池，先在 `metapool-common` 定义这两个能力接口（签名 + Javadoc，零实现）。

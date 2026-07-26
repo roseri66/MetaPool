@@ -19,7 +19,34 @@ MetaPool 使用 `io.github.roseri66` 作为 groupId（GitHub 用户名反向域�
 3. **GPG 密钥**：`gpg --gen-key`，并把公钥上传到公钥服务器
    （`gpg --keyserver keyserver.ubuntu.com --send-keys <KEYID>`）。
 
-## 发布
+## 方式一：GitHub Actions（推荐，凭据不落本机）
+
+仓库 → **Actions** → **Release to Maven Central** → **Run workflow**，填版本号（如 `2.1.0`）。
+
+`dry_run` **默认勾选**：先演练一次，它会完整跑 `-Prelease clean verify`（含 source/javadoc/GPG 签名）
+但**不上传**，用来验证 Secrets 配对、GPG 能否非交互签名、javadoc 能否生成 —— 这三样是发布最常见的绊脚石。
+演练绿了再取消勾选真发。
+
+### 需要预先配好的 4 个 Repository Secret
+
+仓库 → Settings → Secrets and variables → Actions → New repository secret：
+
+| Secret | 取值 |
+|---|---|
+| `CENTRAL_TOKEN_USER` | central.sonatype.com 生成的 User Token 的 **username** |
+| `CENTRAL_TOKEN_PASSWORD` | 同一个 User Token 的 **password** |
+| `GPG_PRIVATE_KEY` | ASCII armored 私钥全文，含首尾 `-----BEGIN/END PGP PRIVATE KEY BLOCK-----`<br>导出：`gpg --armor --export-secret-keys <KEYID>` |
+| `GPG_PASSPHRASE` | 该私钥的口令 |
+
+> ⚠️ 这 4 个值**只存在 GitHub Secrets 里**，绝不写进任何文件（RULES §5.4）。
+
+workflow **刻意不做**这几件事，全部留给人把关：不自动点 Publish（父 pom `autoPublish=false`）、
+不自动提交版本号变更、不自动打 tag。上传完成后仍需：
+central.sonatype.com → Deployments → **Publish** → 打 tag → 建 Release → 把 `main` 推进到下一个 `-SNAPSHOT`。
+
+---
+
+## 方式二：本地发布
 
 ```bash
 # 0. 确认 JAVA_HOME 指向 JDK 17。
