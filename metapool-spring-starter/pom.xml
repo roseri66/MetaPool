@@ -54,19 +54,11 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- 测试：引入两个适配器 + H2，验证 SPI 自动发现与全链路装配 -->
-        <dependency>
-            <groupId>io.github.roseri66</groupId>
-            <artifactId>metapool-adapter-hikari</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.github.roseri66</groupId>
-            <artifactId>metapool-adapter-bucket4j</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
+        <!--
+            测试：两个适配器不在此重复声明 —— 上面 optional 的 compile 依赖本来就在测试 classpath 上。
+            重复声明会触发 Maven「must be unique」告警，且后一条 test scope 会覆盖掉前一条，
+            把 <optional>true</optional> 静默吃掉（坑 P-10，P-05 家族）。
+        -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
