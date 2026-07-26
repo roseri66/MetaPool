@@ -3,7 +3,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.roseri66/metapool-spring-starter?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.roseri66/metapool-spring-starter)
 [![JDK](https://img.shields.io/badge/JDK-17-orange)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen)](https://spring.io/projects/spring-boot)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](.)
+[![CI](https://github.com/roseri66/MetaPool/actions/workflows/ci.yml/badge.svg)](https://github.com/roseri66/MetaPool/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
 > **MetaPool 不重造连接池——它把 HikariCP、Bucket4j 等异构资源管理器纳入一套统一的

@@ -1,0 +1,59 @@
+name: CI
+
+# 2.1 路线图 P0#1。2.0 之前「全绿」只有本地证据，这里把它变成可公开验证的证据。
+on:
+  push:
+    branches: [main]
+    # 只改文档不跑构建，省 runner 时间
+    paths-ignore: ['**/*.md', 'docs/**', 'deploy/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # 同一分支的新 push 取消上一次未跑完的构建
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (JDK ${{ matrix.java }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 开发机是 Windows，使用方绝大多数在 Linux —— 两边都验，避免只在一种平台上「绿」。
+        os: [ubuntu-latest, windows-latest]
+        java: ['17']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # setup-java 会把 JAVA_HOME 指向所选 JDK，因此 CI 上不会重演坑 P-03；
+      # 父 pom 的 enforcer 仍会在 validate 阶段兜底校验。
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Show toolchain
+        run: mvn -v
+
+      # ubuntu runner 自带 Docker，因此 HikariAdapterPostgresTest（Testcontainers PostgreSQL）
+      # 在这里会**真实执行**，而不是像本地无 Docker 时那样自动跳过 —— 这是 CI 带来的真实增量覆盖。
+      - name: Build & test
+        run: mvn -B --no-transfer-progress clean verify
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ matrix.os }}-jdk${{ matrix.java }}
+          path: '**/target/surefire-reports/**'
+          retention-days: 7
+          if-no-files-found: ignore
