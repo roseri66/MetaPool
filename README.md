@@ -37,26 +37,28 @@
 ## MetaPool 的答案：统一治理，而非统一用法
 
 ```
-                     ┌─────────────────────────────┐
-                     │       ResourceManager        │  控制面：注册表 + 编排
-                     │  register / start / close    │  统一 metrics / health / tune
-                     └──────────────┬──────────────┘
-                                    │ 同构地纳管 N 个异构资源
-                     ┌──────────────▼──────────────┐
-   统一治理契约 ────▶│       ManagedResource        │  name / type
-   （所有资源）      │   + ManagedLifecycle         │  start / stop(graceful) / health
-                     │   + MetricsSource            │  bindTo(MeterRegistry) 统一 tag
-                     └──────────────┬──────────────┘
-                                    │ 可选能力（谁有谁实现，编译期隔离，无 UnsupportedOperationException）
-         ┌──────────────┬──────────┴────────┬───────────────┐
-         ▼              ▼                    ▼               ▼
-     Tunable        Pool<T>             RateLimiter    (Lock/Executor…)
-    动态调参      borrow/release         tryAcquire       后续扩展
-         │
-    ┌────▼──────────────────────────────────────┐
-    │  ResourceAdapterFactory (SPI 扩展点)        │  类路径多一个 adapter jar
-    │  HikariAdapter / Bucket4jAdapter / …        │  = 多支持一种资源，核心零改动
-    └─────────────────────────────────────────────┘
+                    +------------------------------+
+                    |       ResourceManager        |  控制面：注册表 + 编排
+                    |   register / start / close   |  统一 metrics / health / tune
+                    +--------------+---------------+
+                                   |  同构地纳管 N 个异构资源
+                    +--------------v---------------+
+                    |       ManagedResource        |  统一治理契约（所有资源都实现）
+                    |   + ManagedLifecycle         |  start / stop(graceful) / health
+                    |   + MetricsSource            |  bindTo(MeterRegistry) 统一 tag
+                    +--------------+---------------+
+                                   |  可选能力：谁有谁实现，编译期隔离
+                                   |  不会出现 UnsupportedOperationException
+      +-------------------+--------+----------+-----------------------+
+      v                   v                   v                       v
+   Tunable             Pool<T>           RateLimiter        (Lock / Executor ...)
+  动态调参            borrow / release       tryAcquire               后续扩展
+      |
+      v
+   +----------------------------------------------+
+   |  ResourceAdapterFactory (SPI extension pt.)  |  类路径多一个 adapter jar
+   |  HikariAdapter / Bucket4jAdapter / ...       |  = 多支持一种资源，核心零改动
+   +----------------------------------------------+
 ```
 
 **核心一刀**：把功能性 API（`borrow/release`、`tryAcquire`、`lock/unlock`）从统一契约里剥离为**可选能力接口**，各资源只实现自己那个。连接池实现 `Pool`，限流器实现 `RateLimiter`，谁都不用假装实现不属于自己的方法——`Bucket4jAdapter` 甚至在编译期就无法被 `instanceof Pool`。

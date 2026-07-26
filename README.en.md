@@ -45,27 +45,28 @@ same time — every layer is an island. MetaPool unifies that governance layer.
 ## The answer: unify governance, not usage
 
 ```
-                    ┌──────────────────────────────┐
-                    │       ResourceManager        │  Control plane: registry + orchestration
-                    │   register / start / close   │  unified metrics / health / tune
-                    └───────────────┬──────────────┘
-                                    │ governs N heterogeneous resources uniformly
-                    ┌───────────────▼──────────────┐
-  Governance    ───▶│       ManagedResource        │  name / type
-  contract          │   + ManagedLifecycle         │  start / stop(graceful) / health
-  (every resource)  │   + MetricsSource            │  bindTo(MeterRegistry), unified tags
-                    └───────────────┬──────────────┘
-                                    │ Optional capabilities — implemented only where they apply.
-                                    │ Isolated at compile time, so no UnsupportedOperationException.
-        ┌──────────────┬────────────┴───────┬────────────────┐
-        ▼              ▼                    ▼                ▼
-    Tunable        Pool<T>             RateLimiter    (Lock / Executor …)
-   hot-tuning   borrow / release        tryAcquire         future work
-        │
-   ┌────▼────────────────────────────────────────┐
-   │  ResourceAdapterFactory (SPI extension pt.) │  One more adapter jar on the
-   │  HikariAdapter / Bucket4jAdapter / …        │  classpath = one more resource
-   └─────────────────────────────────────────────┘  type. Zero core changes.
+                    +------------------------------+
+                    |       ResourceManager        |  Control plane: registry + orchestration
+                    |   register / start / close   |  unified metrics / health / tune
+                    +--------------+---------------+
+                                   |  governs N heterogeneous resources uniformly
+                    +--------------v---------------+
+                    |       ManagedResource        |  Governance contract (every resource)
+                    |   + ManagedLifecycle         |  start / stop(graceful) / health
+                    |   + MetricsSource            |  bindTo(MeterRegistry), unified tags
+                    +--------------+---------------+
+                                   |  Optional capabilities: implemented only where they apply,
+                                   |  isolated at compile time -- no UnsupportedOperationException
+      +-------------------+--------+----------+-----------------------+
+      v                   v                   v                       v
+   Tunable             Pool<T>           RateLimiter        (Lock / Executor ...)
+ hot-tuning       borrow / release       tryAcquire              future work
+      |
+      v
+   +----------------------------------------------+
+   |  ResourceAdapterFactory (SPI extension pt.)  |  one more adapter jar on the classpath
+   |  HikariAdapter / Bucket4jAdapter / ...       |  = one more resource type, zero core changes
+   +----------------------------------------------+
 ```
 
 **The key decision**: functional APIs (`borrow/release`, `tryAcquire`, `lock/unlock`) are pulled out
