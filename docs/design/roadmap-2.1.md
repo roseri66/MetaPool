@@ -36,11 +36,24 @@
   与 §1.5「优先简单稳定、拒绝为显高级而加」冲突；覆盖率数字对本项目的可信度提升也远不如
   「两个平台真实跑通 + PG 容器真实验证」。等真有需要（如多人协作看回归）再议。
 
-### 2. 补齐能力接口：`DistributedLock` / `ManagedExecutor`
-- **做什么**：2.0 里为 YAGNI 只定义了 `Pool` / `RateLimiter`。要接入锁和线程池，先在 `metapool-common` 定义这两个能力接口（签名 + Javadoc，零实现）。
-- **为什么**：它们是下面 #3 里 lock / executor 适配器的前提。
-- **前置**：**接口签名需先确认**（这是 2.1 唯一必须先设计确认的一步）。
-- **风险**：中。锁的语义（可重入 / 超时 / 看门狗续期）差异大，接口要抽得住 Redisson 又不过度。建议参考 2.0 对 `Pool` 的做法：只抽最小公共面，库特有能力留给具体 adapter。
+### 2. 补齐能力接口：`DistributedLock` / `ManagedExecutor` ✅ 已完成（2026-07-26）
+
+- **设计**：[`metapool-2.1-capabilities.md`](metapool-2.1-capabilities.md)（已确认），含 P-07 自查、
+  每个决策的「为什么/不用会怎样」，以及 5 项拍板结果。
+- **已落地**（`metapool-common`，签名 + Javadoc，零实现）：
+  `capability/DistributedLock`、`capability/LockHandle`、`capability/ManagedExecutor`、
+  `stats/LockStats`、`stats/ExecutorStats`。
+- **三条定型决策**：
+  1. 锁发放**持有凭证**而非 `unlock(key)` —— 后者无法判断调用方是否持有者，会导致「租约到期后
+     解了别人的锁」这个经典事故；凭证 `extends AutoCloseable`，try-with-resources 即正确用法。
+  2. `ManagedExecutor extends Executor` 但**不 extends `ExecutorService`** —— 后者带 `shutdown()`，
+     会开出绕过控制面的第二个停机入口。
+  3. 线程池饱和**透传** `RejectedExecutionException` 而非包装 —— 「别在接口层发明第二套饱和语义」。
+     已在 RULES §3.2 记为明示例外并划清反向边界。
+- **守护**：`CapabilityIsolationTest` 用反射断言两个新接口都不继承 `Pool`、`ManagedExecutor` 不继承
+  `ExecutorService`、`DistributedLock` 没有 `unlock` 方法 —— 让违反变成红灯而非 review 的运气。
+- **核心零改动**：`ResourceTypes.EXECUTOR` / `LOCK` 常量早已存在，`DefaultResourceManager` 只认
+  `ManagedResource` + `instanceof Tunable`，无需认识新接口。
 
 ---
 

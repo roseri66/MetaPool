@@ -1,6 +1,6 @@
 # 2.1 能力接口设计：`DistributedLock` / `ManagedExecutor`
 
-> **状态：待确认（签名未定稿，尚无实现）**
+> **状态：已确认（2026-07-26），签名已落地到 `metapool-common`，适配器待实现**
 > 依据路线图 [`roadmap-2.1.md`](roadmap-2.1.md) P0#2 —— 这是 2.1 唯一必须先设计确认的一步。
 > 规范依据：RULES §1.1（代码前先确认设计）、§1.6（每个设计回答"为什么需要/不用会怎样"）、
 > §2.2（能力接口必须编译期隔离，禁止 `UnsupportedOperationException`）、台账 P-07。
@@ -264,9 +264,9 @@ public record ExecutorStats(int activeCount, int poolSize, int corePoolSize, int
 `Future` 只能阻塞 `get()`，无法组合。`CompletableFuture` 是 `Future` 的子类型，
 调用方想当 `Future` 用完全兼容，想链式组合也支持——**严格更强,无损失**。
 
-### 2.6 待定：拒绝时抛什么异常
+### 2.6 已定：拒绝时**透传** `RejectedExecutionException`
 
-这是本设计**唯一我拿不准、需要你拍板**的点。
+**决定（2026-07-26）：透传，不包装。**
 
 RULES §3.2 要求「异常统一继承 `MetaPoolException` 并携带 `ErrorCode`」。但线程池饱和时，
 JDK 的既定契约是抛 `RejectedExecutionException`，而且 `CompletableFuture`、Spring `@Async`
@@ -277,8 +277,14 @@ JDK 的既定契约是抛 `RejectedExecutionException`，而且 `CompletableFutu
 | **A（推荐）**：透传 JDK 的 `RejectedExecutionException` | 与 JDK/Spring 生态互操作完好；符合"统一治理不统一用法" | 与 §3.2 字面冲突，需在 RULES 里记一条例外 |
 | B：包装成 `MetaPoolException(POOL-006)` | 严格符合 §3.2 | 破坏互操作；调用方 catch `RejectedExecutionException` 会失效 |
 
-倾向 **A**，并在 §3.2 补一句例外说明：「当底层库的异常类型本身是生态契约的一部分（如
-`RejectedExecutionException`、`SQLException`）时透传，不强行包装」。
+**采纳 A。** 用户裁定的理由比"互操作"更根本：
+
+> **「别在接口层发明第二套饱和语义。」**
+
+也就是说，问题不只是 catch 不到，而是 MetaPool 不该为一个**已有既定含义**的概念再造一套词汇——
+这与 §2.1「统一的是治理，不是用法」同源。RULES §3.2 已据此补上明示例外，并划清反向边界：
+MetaPool **自己**产生的错误（未启动、配置非法、调参被拒）仍必须是 `MetaPoolException` + `ErrorCode`，
+透传只适用于「底层库在其既定语义下抛出的异常」。
 
 ### 2.7 治理落点
 
@@ -306,14 +312,17 @@ JDK 内置，不违反 §2.4「只依赖 micrometer-core / slf4j」。
 
 ---
 
-## 4. 需要你拍板的 5 个点
+## 4. 拍板结果（2026-07-26 全部确认）
 
-1. **锁：凭证式 vs 键式** —— 推荐凭证式（§1.2），代价是调用方要写 `Optional` 解包
-2. **锁：可重入与 fencing token 都不进统一接口** —— 推荐不进（§1.5），将来用 `FencedLock` 子接口扩展
-3. **执行器：extends `Executor` 但不 extends `ExecutorService`** —— 推荐（§2.3），核心理由是不能有第二个停机入口
-4. **执行器：`unwrap()` 暴露原生 `ExecutorService`** —— 推荐提供（与 `HikariAdapter.getConnection()` 一致），
-   但只能靠文档约束不许调 `shutdown()`。若你认为风险太大，备选是返回一个屏蔽 shutdown 的包装视图（更安全但更"魔法"，与 §1.5 简单优先有张力）
-5. **执行器：拒绝时透传 `RejectedExecutionException`（§2.6）** —— 推荐透传，并在 RULES §3.2 补例外
+1. ✅ **锁：凭证式**（§1.2）—— 代价是调用方要写 `Optional` 解包，换来接口层杜绝误解他人的锁
+2. ✅ **锁：可重入与 fencing token 都不进统一接口**（§1.5）—— 将来用 `FencedLock` 子接口扩展
+3. ✅ **执行器：extends `Executor`，不 extends `ExecutorService`**（§2.3）—— 不能有第二个停机入口
+4. ✅ **执行器：提供 `unwrap()`**（与 `HikariAdapter.getConnection()` 一致），靠 javadoc 契约约束不许调
+   `shutdown()`。未采用"屏蔽 shutdown 的包装视图"——更安全但更"魔法"，与 §1.5 简单优先有张力
+5. ✅ **执行器：拒绝时透传 `RejectedExecutionException`**（§2.6）—— RULES §3.2 已补明示例外
 
-拍板后我再写实现，顺序建议：先 `commons-pool2` adapter（最对称、验证不了新接口但风险最低），
+**已落地**：5 个文件进 `metapool-common`（两个能力接口 + `LockHandle` + 两个 stats record）
++ `CapabilityIsolationTest` 结构性守护。核心零改动，`mvn clean verify` 绿。
+
+**下一步适配器顺序**：先 `commons-pool2` adapter（最对称、验证不了新接口但风险最低），
 再 `jdk-executor`（验证 `ManagedExecutor`），最后 `redisson`（验证 `DistributedLock`，需 Testcontainers Redis）。

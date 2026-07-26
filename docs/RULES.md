@@ -34,6 +34,13 @@
 
 1. **JDK 17+**，Spring Boot 3.x。包名 `com.metapool.{module}`，发布 groupId `io.github.roseri66`。
 2. 异常统一继承 `MetaPoolException` 并携带 `ErrorCode`（格式 `POOL-NNN`）。
+   - **例外（2026-07-26 确认）**：当底层库/JDK 的异常类型**本身就是生态契约的一部分**时，
+     **透传，不包装**。典型即线程池饱和的 `java.util.concurrent.RejectedExecutionException`
+     —— `CompletableFuture`、Spring `@Async` 等基础设施会按该类型做处理，包装即破坏互操作。
+   - 判据一句话：**不要在接口层发明第二套已有既定含义的语义**。这与 §2.1「统一的是治理，
+     不是用法」同源 —— 包装一个人人都认识的异常，等于发明第二套词汇。
+   - 反向边界：MetaPool **自己**产生的错误（未启动、配置非法、调参被拒、资源不存在）
+     仍必须是 `MetaPoolException` + `ErrorCode`。透传只适用于「底层库在其既定语义下抛出的异常」。
 3. 配置**不可变 + 启动即校验（fail-fast）**。
 4. 指标统一 tag：`metapool.resource` / `metapool.type`。新 adapter 必须遵守，否则「一个看板看全部」的头牌能力就破了。
 5. 生命周期方法（`start`/`stop`）要 `synchronized`，`stop()` 必须**释放并置空**底层持有对象，保证 stop→start 能重启（见坑 P-01）。
@@ -42,7 +49,7 @@
 ## 4. 测试规则
 
 1. 每个新能力至少一条测试；**修一个 bug 必须补一条会失败的回归测试**。
-2. 合入前 `mvn clean test` 必须全绿。当前基线：**37 个测试**（+1 个 Testcontainers PG 用例在无 Docker 时自动跳过）。
+2. 合入前 `mvn clean test` 必须全绿。当前基线：**41 个测试**（+1 个 Testcontainers PG 用例在无 Docker 时自动跳过）。
    改动基线数字时必须是实测值（`Tests run` 汇总），不许估。
 3. 依赖外部环境的集成测试必须**可跳过**，不得阻塞无 Docker 的构建。
 4. 不为了凑数写空断言测试；测试数量对外报告时按实测。
