@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    使用方冒烟测试 —— 以「第一次听说 MetaPool 的外部使用方」身份，从 Maven Central 拉正式件试用。
+
+    ⚠️ 本项目【刻意不在根 pom 的 <modules> 里】。
+       一旦进 reactor，依赖就会从本地 reactor 解析，而不是从 Central 下载 ——
+       那样它验证的就成了「我刚编译出来的东西能用」，而不是「我发布出去的东西能用」，
+       整个测试的意义就没了。因此必须用 -f smoke-consumer/pom.xml 单独跑。
+
+    它要回答的问题只有一个：**发布到 Central 的那几个 jar，别人拿去真的能跑起来吗？**
+
+    由来：2026-08-13 手工做过一次这样的试用，发现 README 快速开始漏了
+    micrometer-registry-prometheus（照抄的人看指标会 404）。手工能发现一次，
+    但不会每次发版都做 —— 所以固化成这个模块。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 像真实使用方那样以 Spring Boot 为父 pom，而不是 metapool-parent -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.github.roseri66.smoke</groupId>
+    <artifactId>metapool-consumer-smoke</artifactId>
+    <version>1.0.0</version>
+    <name>MetaPool Consumer Smoke Test</name>
+    <description>从 Maven Central 拉正式件，验证外部使用方真的能用起来</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <!-- 要验证哪个已发布版本；发版后用 -Dmetapool.version=X.Y.Z 覆盖 -->
+        <metapool.version>2.3.0</metapool.version>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 用 BOM 对齐版本，这也是 README 推荐给使用方的做法，顺带验证 BOM 本身可用 -->
+            <dependency>
+                <groupId>io.github.roseri66</groupId>
+                <artifactId>metapool-bom</artifactId>
+                <version>${metapool.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- 注意：下面这些都不写 version —— 全靠 BOM 对齐，这本身就是对 BOM 的验证 -->
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-spring-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-adapter-hikari</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-adapter-bucket4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-adapter-jdk-executor</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

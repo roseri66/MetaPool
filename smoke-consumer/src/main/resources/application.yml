@@ -1,0 +1,30 @@
+# 完全照 README「快速开始 · 方式一」的写法，只把 PostgreSQL 换成 H2（冒烟测试不该依赖外部数据库）。
+# 如果哪天 README 的示例配置写错了，这里会先炸。
+metapool:
+  datasources:
+    main:
+      jdbc-url: jdbc:h2:mem:smoke;DB_CLOSE_DELAY=-1
+      username: sa
+      password: ""
+      maximum-pool-size: 10
+      tunable: [maximum-pool-size, connection-timeout]
+  rate-limiters:
+    api:
+      limit-for-period: 100
+      refill-period: 1s
+      tunable: [limit-for-period]
+  executors:
+    worker:
+      core-pool-size: 2
+      maximum-pool-size: 4
+      queue-capacity: 50
+      tunable: [core-pool-size, maximum-pool-size]
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metapool, prometheus
+  endpoint:
+    health:
+      show-details: always

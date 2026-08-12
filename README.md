@@ -84,6 +84,12 @@
     <artifactId>metapool-adapter-hikari</artifactId>
     <version>2.3.0</version>
 </dependency>
+<!-- 想在 /actuator/prometheus 看到下面那些 metapool_* 指标，还需要这个（Spring Boot 的常规要求，
+     不是 MetaPool 特有）。只用 /actuator/metapool 查看与调参的话可以不引。 -->
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+</dependency>
 ```
 
 ```yaml

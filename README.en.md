@@ -100,6 +100,13 @@ parameters, so it simply does not claim the capability.
     <artifactId>metapool-adapter-hikari</artifactId>
     <version>2.3.0</version>
 </dependency>
+<!-- Needed for the metapool_* metrics below to show up on /actuator/prometheus.
+     This is a standard Spring Boot requirement, not something MetaPool adds.
+     Skip it if you only use /actuator/metapool to inspect and tune. -->
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+</dependency>
 ```
 
 ```yaml

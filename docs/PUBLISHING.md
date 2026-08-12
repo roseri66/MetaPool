@@ -42,7 +42,20 @@ MetaPool 使用 `io.github.roseri66` 作为 groupId（GitHub 用户名反向域�
 
 workflow **刻意不做**这几件事，全部留给人把关：不自动点 Publish（父 pom `autoPublish=false`）、
 不自动提交版本号变更、不自动打 tag。上传完成后仍需：
-central.sonatype.com → Deployments → **Publish** → 打 tag → 建 Release → 把 `main` 推进到下一个 `-SNAPSHOT`。
+central.sonatype.com → Deployments → **Publish** → **跑一次使用方冒烟**（见下）→ 打 tag → 建 Release →
+把 `main` 推进到下一个 `-SNAPSHOT`。
+
+### Publish 之后必做：使用方冒烟
+
+Actions → **Consumer Smoke (against Maven Central)** → 填刚发布的版本号。
+
+它以**外部使用方**身份、**只从 Maven Central 解析依赖**，验证 README 承诺的四件事真的成立
+（零装配纳管 / 能力接口可用 / 端点能查能热调 / 三个库指标同一套 tag）。
+
+**为什么它不能被 `ci.yml` 替代**：CI 编译的是本仓库源码，回答「我写的代码对不对」；
+冒烟拉的是已发布的 jar，回答「我发出去的东西别人能不能用」。
+**这两件事不等价** —— 2.0.0 就发生过：仓库里一切正常，但打进 starter 的 `logback-spring.xml`
+让所有使用方的日志静默消失（P-08）。那类问题只有站在使用方那一侧才看得见。
 
 ---
 

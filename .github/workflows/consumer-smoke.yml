@@ -1,0 +1,70 @@
+name: Consumer Smoke (against Maven Central)
+
+# 只允许手动触发，并在 PUBLISHING.md 里被列为「Publish 之后必做的一步」。
+#
+# 它回答的问题和 CI 不同：
+#   ci.yml            —— 我刚写的代码是对的吗？（编译本仓库源码）
+#   consumer-smoke.yml —— 我发布出去的 jar，别人拿去真的能跑吗？（只从 Central 下载）
+#
+# 这两件事不等价。2.0.0 就发生过：仓库里一切正常，但打进 starter 的 logback-spring.xml
+# 让所有使用方的日志静默消失（台账 P-08）。那类问题只有站在使用方这一侧才看得见。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要验证的已发布版本（必须已在 Maven Central 上，如 2.3.0）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # 关键一步：把本地仓库里可能存在的 metapool 制品清掉。
+      # 否则一旦本机/缓存里有同版本的 SNAPSHOT 或早先 install 过的产物，
+      # 依赖就会命中本地而不是真的去 Central 下载 —— 那这个 workflow 就成了自欺欺人。
+      - name: Purge any locally cached MetaPool artifacts
+        run: rm -rf ~/.m2/repository/io/github/roseri66
+
+      - name: Verify the version is actually on Maven Central
+        run: |
+          V='${{ inputs.version }}'
+          URL="https://repo1.maven.org/maven2/io/github/roseri66/metapool-bom/$V/metapool-bom-$V.pom"
+          echo "探测 $URL"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
+          if [ "$CODE" != "200" ]; then
+            echo "::error::$V 不在 Maven Central 上（HTTP $CODE）。先 Publish 再跑本 workflow。"
+            exit 1
+          fi
+          echo "✅ $V 已在 Central"
+
+      - name: Run consumer smoke test
+        run: >
+          mvn -B --no-transfer-progress
+          -f smoke-consumer/pom.xml
+          -Dmetapool.version=${{ inputs.version }}
+          clean verify
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 使用方冒烟：${{ inputs.version }}"
+            echo ""
+            echo "以外部使用方身份，仅从 Maven Central 解析依赖，验证："
+            echo "1. 只写 YAML、零装配代码，三类异构资源被纳管"
+            echo "2. 业务经能力接口（Pool / RateLimiter / ManagedExecutor）使用资源"
+            echo "3. \`/actuator/metapool\` 能查、能热调，白名单外的 key 被拒"
+            echo "4. \`/actuator/prometheus\` 上三个库的指标带同一套 tag"
+          } >> $GITHUB_STEP_SUMMARY

@@ -3,7 +3,7 @@
 > 本文件是 MetaPool 的**唯一规范入口**：协作方式、工程约定、构建/发布纪律，以及**踩坑台账**。
 > 规则：**每踩一个坑，必须当场追加到第七节「踩坑台账」**，不允许只在会话里口头说完就算。
 > 相关：需求与设计见 `docs/design/`，发布流程见 `docs/PUBLISHING.md`，跨会话上下文见 `../项目记忆.md`。
-> 最后更新：2026-08-12（新增 P-19 ~ P-23；P-23 来自 2.2 的 core 故障路径补测）
+> 最后更新：2026-08-13（新增 P-19 ~ P-24；P-24 来自使用方冒烟测试）
 
 ---
 
@@ -314,3 +314,19 @@
 - **通用教训**：**治理面必须比被治理者更结实。** 凡控制面遍历资源做聚合的地方
   （health / metrics / stats / 未来的 tracing），都要先问「其中一个不守规矩会怎样」。
 - **日期**：2026-08-12
+
+### P-24 `@SpringBootTest` 默认关掉 metrics export，`/actuator/prometheus` 在测试里必然 404
+- **现象**：使用方冒烟测试里 `/actuator/prometheus` 返回 404，而**同一份配置 `java -jar` 跑真应用完全正常**。
+  第一反应是「MetaPool 的指标坏了」或「少引了 micrometer-registry-prometheus」——两个都不是。
+- **原因**：Spring Boot 在 `@SpringBootTest` 中**默认关闭 metrics/tracing 的导出自动配置**，
+  上下文里只剩一个 `SimpleMeterRegistry`，**连一个 Prometheus bean 都不会创建**，端点自然没被映射。
+  依赖在类路径上（`dependency:tree` 能看到），所以从依赖入手排查会一路查空。
+- **排查路径**（这次真正定位到问题的那一步）：别猜，直接问应用「你到底暴露了什么」——
+  在测试里 GET `/actuator` 看 `_links`，再列 `MeterRegistry` 类型的 bean。
+  一看到「只有 simpleMeterRegistry、没有任何 prometheus bean」，方向立刻就对了。
+- **修法**：测试类加 `@AutoConfigureObservability`。已在 `ConsumerSmokeTest` 的类注释里写明
+  **「这个注解不能删」**及原因，防止后来者当成多余的注解删掉。
+- **通用教训**：**「测试里不通」和「线上不通」是两回事。** 测试框架为了跑得快会关掉一批自动配置，
+  于是测试环境比真实环境「少东西」。遇到只在测试里复现的缺失，先怀疑测试切片，
+  再怀疑产品代码 —— 反过来会浪费很多时间。
+- **日期**：2026-08-13
