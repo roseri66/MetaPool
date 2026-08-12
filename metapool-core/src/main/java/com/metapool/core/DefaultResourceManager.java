@@ -133,13 +133,39 @@ public final class DefaultResourceManager implements ResourceManager {
         log.info("[MetaPool] metrics bound for {} resource(s)", all.size());
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>对行为不端的资源免疫</b>：{@link ManagedResource#health()} 的契约是「返回瞬时快照，
+     * 不抛异常」，但第三方 adapter 可能违约。聚合健康恰恰是<b>出事的时候</b>要看的东西 ——
+     * 若一个资源抛异常就能让整个 {@code /actuator/health} 报错，那么最需要它的时刻它正好不可用，
+     * 而且运维看到的会是一个与真实故障无关的异常。
+     *
+     * <p>因此：{@code health()} 抛异常或返回 {@code null} 的资源一律<b>计为 DOWN 并在 detail 里点名</b>，
+     * 其余资源照常参与聚合。见坑 P-23。
+     */
     @Override
     public HealthStatus health() {
         boolean anyDown = false;
         boolean anyDegraded = false;
         StringJoiner problems = new StringJoiner(", ");
         for (ManagedResource r : snapshot()) {
-            HealthStatus h = r.health();
+            HealthStatus h;
+            try {
+                h = r.health();
+            } catch (RuntimeException e) {
+                anyDown = true;
+                problems.add(r.name() + ":DOWN(health() threw "
+                        + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
+                log.warn("[MetaPool] resource '{}' health() threw; counted as DOWN", r.name(), e);
+                continue;
+            }
+            if (h == null) {
+                anyDown = true;
+                problems.add(r.name() + ":DOWN(health() returned null)");
+                log.warn("[MetaPool] resource '{}' health() returned null; counted as DOWN", r.name());
+                continue;
+            }
             switch (h.status()) {
                 case DOWN -> {
                     anyDown = true;
