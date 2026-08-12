@@ -134,7 +134,7 @@
 |---|---|---|
 | Metrics 生命周期 | `stop()` 时从 registry 注销自己的 meter | 2.0 现状：停机后 gauge 仍在，读到 0（已 null-safe）。清理更干净，但非 bug。低优先。 |
 | Tracing | 接 Micrometer Observation，给 borrow / tryAcquire 埋 span | 有价值，但只有在有链路追踪后端时才有意义。可选。 |
-| `Pool.borrow(Duration)` 真超时 | 让 Hikari 适配器真正按传入 timeout 限时（当前以配置 connectionTimeout 为界，已文档说明） | 修掉 2.0 记录的阻抗。中等价值。 |
+| `Pool.borrow(Duration)` 真超时 | **🟡 部分兑现**：`CommonsPool2Adapter` 天然是真超时（Pool2 原生支持 `borrowObject(Duration)`，有测试坐实）；`HikariAdapter` 仍以配置的 `connectionTimeout` 为界、参数仅作提示。**两边 javadoc 已互相点名说明**，不让人以为哪儿都一样。剩下的问题是要不要给 Hikari 做真超时——它没有原生支持，只能靠额外线程/包装，代价可能大于收益，**待评估**。 |
 | Health 细节 | Actuator `/health` 暴露每个资源的 per-resource 明细 | 运维友好。低成本。 |
 | 注解式配置 | `@MetaPoolDataSource` 之类 | 2.0 判为「YAML 够用」。除非有明确诉求，**不做**（避免过度设计）。 |
 

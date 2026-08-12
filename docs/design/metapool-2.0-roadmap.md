@@ -1,5 +1,8 @@
 # MetaPool 2.0 — Implementation Roadmap（Phase 3）
 
+> 📌 **历史文档**：本文件是 2.0 时期的规划记录，**刻意不随后续版本改写** —— 它记录的是当时怎么想的，改了就失去价值。
+> 当前状态请看 [`roadmap-2.1.md`](roadmap-2.1.md) 与仓库根的 `CHANGELOG.md`。
+
 > 配套设计文档：[metapool-2.0.md](./metapool-2.0.md)
 > 开发方式：按真实开源项目流程分 Milestone 推进，**每个 Milestone 完成并验收后再进下一个**。
 > 纪律：任何实现代码开工前，接口签名先经设计确认（工作原则 5）。

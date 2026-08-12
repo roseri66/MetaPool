@@ -57,10 +57,10 @@ same time — every layer is an island. MetaPool unifies that governance layer.
                     +--------------+---------------+
                                    |  Optional capabilities: implemented only where they apply,
                                    |  isolated at compile time -- no UnsupportedOperationException
-      +-------------------+--------+----------+-----------------------+
-      v                   v                   v                       v
-   Tunable             Pool<T>           RateLimiter        (Lock / Executor ...)
- hot-tuning       borrow / release       tryAcquire              future work
+      +------------+-----------+-------------+----------------+
+      v            v           v             v                v
+   Tunable      Pool<T>    RateLimiter  DistributedLock  ManagedExecutor
+  hot-tuning  borrow/release  tryAcquire  tryLock→handle   execute/submit
       |
       v
    +----------------------------------------------+
@@ -75,6 +75,11 @@ the ones it actually has. A connection pool implements `Pool`; a rate limiter im
 `RateLimiter`; nobody has to fake a method that doesn't apply to it. `Bucket4jAdapter` is `final`
 and does not implement `Pool`, so `instanceof Pool` on it **fails to compile** — the isolation is
 enforced by the compiler, not by convention.
+
+**All five capability interfaces now have real implementations, and not one of them was forced to
+throw `UnsupportedOperationException`.** The converse holds too: the Redisson adapter **does not
+implement `Tunable`** — a lock takes `waitTime`/`leaseTime` per call, so it has no runtime-tunable
+parameters, so it simply does not claim the capability.
 
 ---
 
@@ -135,13 +140,19 @@ metaPool.close();                        // graceful shutdown in reverse order (
 
 ## Unified observability + runtime tuning
 
-**Connection-pool and rate-limiter metrics live in the same `MeterRegistry` under the same tag
+**Metrics for all five resource kinds live in the same `MeterRegistry` under the same tag
 scheme** — one Grafana dashboard covers every governed resource:
 
 ```
-metapool.datasource.connections.active{metapool.resource="main", metapool.type="datasource"}
-metapool.ratelimiter.available.tokens{metapool.resource="order-api", metapool.type="rate-limiter"}
+metapool.datasource.connections.active{metapool.resource="main",        metapool.type="datasource"}
+metapool.ratelimiter.available.tokens{metapool.resource="order-api",    metapool.type="rate-limiter"}
+metapool.executor.queue.size         {metapool.resource="order-worker", metapool.type="executor"}
+metapool.lock.lease.expired.total    {metapool.resource="order-lock",   metapool.type="lock"}
+metapool.object.pending              {metapool.resource="buffer-pool",  metapool.type="object"}
 ```
+
+Underneath sit five unrelated libraries — HikariCP, Bucket4j, the JDK, Redisson and Commons Pool2 —
+yet their metrics line up on a single dashboard. That is what "unified governance" buys you.
 
 **Tune parameters at runtime, without a restart**, through the Actuator endpoint:
 
@@ -174,8 +185,10 @@ docker compose -f deploy/docker-compose.dev.yml up -d    # Prometheus + Grafana 
 
 The bundled dashboard
 [`deploy/grafana/dashboards/metapool-overview.json`](deploy/grafana/dashboards/metapool-overview.json)
-shows pool state (active/idle/pending) next to rate-limiter state (available tokens, allow/reject
-rates) **on one screen**. Metric names and alert rules live in [`deploy/`](deploy).
+has five rows **on one screen**: connection pool (active/idle/pending), rate limiter (available
+tokens, allow/reject rates), thread pool (threads, queue depth, completed/rejected rates),
+distributed lock (locks held, acquire/timeout, lease expiry) and object pool (active/idle, waiters,
+borrow/release rates). Metric names and alert rules live in [`deploy/`](deploy).
 
 ---
 
@@ -187,7 +200,9 @@ rates) **on one screen**. Metric names and alert rules live in [`deploy/`](deplo
 | `ManagedLifecycle` | `start` / `stop(graceful)` / `health` | The only capability *every* resource genuinely shares — the pivot point of the redesign |
 | `MetricsSource` | `bindTo(MeterRegistry)` with unified tags | The technical basis for "one dashboard for everything" |
 | `Tunable` *(optional)* | Whitelisted runtime tuning | Governance without restarts |
-| `Pool<T>` / `RateLimiter` *(optional)* | Each resource's native capability | Capability isolation — this is what eliminates the LSP violation |
+| `Pool<T>` / `RateLimiter` *(optional)* | Borrow/return; rate limiting | Capability isolation — this is what eliminates the LSP violation |
+| `DistributedLock` / `LockHandle` *(optional, 2.1)* | Acquiring a lock hands back a **holder token**; there is deliberately no `unlock(key)` | `unlock(key)` cannot tell whether the caller still holds the lock, so it eventually unlocks *someone else's* |
+| `ManagedExecutor` *(optional, 2.1)* | Submit tasks; extends `Executor` but **never** `ExecutorService` | `ExecutorService` carries `shutdown()`, which would open a second shutdown path around the control plane |
 | `ResourceManager` | Registry + orchestration + aggregated health | Governance is cross-cutting and needs a central orchestrator |
 | `ResourceAdapterFactory` | SPI extension point | Supporting a new resource = writing one adapter |
 

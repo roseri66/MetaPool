@@ -1,6 +1,13 @@
 # 2.1 能力接口设计：`DistributedLock` / `ManagedExecutor`
 
-> **状态：已确认（2026-07-26），签名已落地到 `metapool-common`，适配器待实现**
+> **状态：✅ 全部落地（2026-08-12）。** 签名于 2026-07-26 进入 `metapool-common`；
+> `ManagedExecutor` 由 [`metapool-adapter-jdk-executor`](../../metapool-adapter-jdk-executor) 实现，
+> `DistributedLock` 由 [`metapool-adapter-redisson`](../../metapool-adapter-redisson) 实现，
+> 均随 **2.1.0** 发布 Maven Central。
+>
+> **两个接口的实现都没有被迫抛 `UnsupportedOperationException`** —— 这是本设计成立的判据，
+> 也是台账 P-07 那条教训被真正兑现的证据。落地时的取舍见
+> [`adapter-redisson.md`](adapter-redisson.md) 与 [`roadmap-2.1.md`](roadmap-2.1.md) 的完成记录。
 > 依据路线图 [`roadmap-2.1.md`](roadmap-2.1.md) P0#2 —— 这是 2.1 唯一必须先设计确认的一步。
 > 规范依据：RULES §1.1（代码前先确认设计）、§1.6（每个设计回答"为什么需要/不用会怎样"）、
 > §2.2（能力接口必须编译期隔离，禁止 `UnsupportedOperationException`）、台账 P-07。

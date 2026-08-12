@@ -1,5 +1,8 @@
 # MetaPool 2.0 需求与工程约定
 
+> 📌 **历史文档**：本文件是 2.0 时期的规划记录，**刻意不随后续版本改写** —— 它记录的是当时怎么想的，改了就失去价值。
+> 当前状态请看 [`roadmap-2.1.md`](roadmap-2.1.md) 与仓库根的 `CHANGELOG.md`。
+
 > 本文以 2.0「资源治理控制面」的视角，收敛并取代 1.0 的 BRD/PRD/需求范围/项目 Rules 等规划文档。
 > 架构与技术选型见 [`metapool-2.0.md`](./metapool-2.0.md)；模块拆分与里程碑见 [`metapool-2.0-roadmap.md`](./metapool-2.0-roadmap.md)。
 

@@ -49,10 +49,10 @@
                     +--------------+---------------+
                                    |  可选能力：谁有谁实现，编译期隔离
                                    |  不会出现 UnsupportedOperationException
-      +-------------------+--------+----------+-----------------------+
-      v                   v                   v                       v
-   Tunable             Pool<T>           RateLimiter        (Lock / Executor ...)
-  动态调参            borrow / release       tryAcquire               后续扩展
+      +------------+-----------+-------------+----------------+
+      v            v           v             v                v
+   Tunable      Pool<T>    RateLimiter  DistributedLock  ManagedExecutor
+   动态调参   borrow/release  tryAcquire   tryLock→凭证     execute/submit
       |
       v
    +----------------------------------------------+
@@ -62,6 +62,8 @@
 ```
 
 **核心一刀**：把功能性 API（`borrow/release`、`tryAcquire`、`lock/unlock`）从统一契约里剥离为**可选能力接口**，各资源只实现自己那个。连接池实现 `Pool`，限流器实现 `RateLimiter`，谁都不用假装实现不属于自己的方法——`Bucket4jAdapter` 甚至在编译期就无法被 `instanceof Pool`。
+
+**五个能力接口现已全部有真实现，没有一个被迫抛 `UnsupportedOperationException`。** 反过来也成立：Redisson 锁**不实现** `Tunable`（它的 `waitTime`/`leaseTime` 是每次调用传入的，没有运行时可调参数），**没有就不声明**，不为「显得完整」硬凑。
 
 ---
 
@@ -120,12 +122,17 @@ metaPool.close();                        // 逆序优雅停机（drain）
 
 ## 统一可观测 + 动态调参（头牌能力）
 
-**一个 `MeterRegistry` 里，连接池与限流器的指标共存、统一 tag** —— 一个 Grafana 看板看到所有资源：
+**一个 `MeterRegistry` 里，五类异构资源的指标共存、统一 tag** —— 一个 Grafana 看板看到所有资源：
 
 ```
-metapool.datasource.connections.active{metapool.resource="main", metapool.type="datasource"}
-metapool.ratelimiter.available.tokens{metapool.resource="order-api", metapool.type="rate-limiter"}
+metapool.datasource.connections.active{metapool.resource="main",         metapool.type="datasource"}
+metapool.ratelimiter.available.tokens{metapool.resource="order-api",     metapool.type="rate-limiter"}
+metapool.executor.queue.size         {metapool.resource="order-worker",  metapool.type="executor"}
+metapool.lock.lease.expired.total    {metapool.resource="order-lock",    metapool.type="lock"}
+metapool.object.pending              {metapool.resource="buffer-pool",   metapool.type="object"}
 ```
+
+底层是 HikariCP / Bucket4j / JDK / Redisson / Commons Pool2 五个毫不相干的库，指标却能在同一块看板上并列——这正是「统一治理」的兑现处。
 
 **运行时不停机调参**，经 Actuator 端点：
 
@@ -153,8 +160,9 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 ```
 
 预置看板 [`deploy/grafana/dashboards/metapool-overview.json`](deploy/grafana/dashboards/metapool-overview.json)
-在**同一屏**展示连接池状态（active/idle/pending）与限流器（可用令牌 / 放行·拒绝速率），
-指标名与告警规则见 [`deploy/`](deploy)。
+分五行展示：**连接池**（active/idle/pending）、**限流器**（可用令牌 / 放行·拒绝速率）、
+**线程池**（线程数 / 队列深度 / 完成·拒绝速率）、**分布式锁**（持有数 / 获取·超时 / 租约到期）、
+**对象池**（借出·空闲 / 排队者 / 借还速率）。指标名与告警规则见 [`deploy/`](deploy)。
 
 ---
 
@@ -166,7 +174,9 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 | `ManagedLifecycle` | start / stop(graceful) / health | 所有资源真正共有的能力（重构支点） |
 | `MetricsSource` | bindTo(MeterRegistry) 统一 tag | 「一个看板看全部」的技术地基 |
 | `Tunable`（可选） | 白名单动态调参 | 不停机治理 |
-| `Pool<T>` / `RateLimiter`（可选） | 各资源的原生能力 | 能力隔离，根除 LSP 破坏 |
+| `Pool<T>` / `RateLimiter`（可选） | 借还 / 限流 | 能力隔离，根除 LSP 破坏 |
+| `DistributedLock` / `LockHandle`（可选，2.1） | 加锁只发放**持有凭证**，不提供 `unlock(key)` | 后者判断不了调用方是否持有者，会「解掉别人的锁」 |
+| `ManagedExecutor`（可选，2.1） | 提交任务；extends `Executor` 但**绝不** extends `ExecutorService` | 后者带 `shutdown()`，等于开出绕过控制面的第二停机入口 |
 | `ResourceManager` | 注册表 + 编排 + 聚合 health | 治理是横切的，需中心编排者 |
 | `ResourceAdapterFactory` | SPI 扩展点 | 加一种资源 = 写一个 adapter |
 

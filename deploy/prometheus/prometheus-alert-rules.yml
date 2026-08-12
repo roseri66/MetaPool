@@ -1,6 +1,14 @@
 # ============================================================
-# MetaPool — Prometheus 告警规则（2.0）
-# 基于治理控制面实际导出的指标（metapool_datasource_* / metapool_ratelimiter_*）
+# MetaPool — Prometheus 告警规则（2.1）
+# 基于治理控制面实际导出的指标：
+#   metapool_datasource_* / metapool_ratelimiter_* / metapool_executor_*
+#   metapool_lock_*       / metapool_object_*
+#
+# 口径统一：只在「有人受影响」时才告警，光是资源用满不算故障——
+# 连接池借满、线程池线程跑满、对象池借光，都可能正是它在满负荷工作。
+# 因此饱和类告警一律要求「同时有等待者 / 已产生拒绝」。
+#
+# ⚠️ 新增 adapter 后记得回来补规则：指标有了而告警没跟上，等于白埋点。
 # ============================================================
 
 groups:
@@ -44,3 +52,77 @@ groups:
           description: >
             限流器 {{ $labels.metapool_resource }} 在过去 5 分钟持续产生拒绝。
             若为预期削峰可忽略；否则考虑热调 limit-for-period（/actuator/metapool）。
+
+      # ── 4. 线程池饱和：已在拒绝任务 ──
+      # 只看队列深度会误报（深队列本就是设计意图），拒绝才是真的丢任务。
+      - alert: ExecutorRejecting
+        expr: sum by (metapool_resource) (rate(metapool_executor_rejected_total[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+          category: executor
+        annotations:
+          summary: "MetaPool 线程池正在拒绝任务"
+          description: >
+            线程池 {{ $labels.metapool_resource }} 在过去 5 分钟持续拒绝任务，说明已经饱和。
+            处置：热调 core-pool-size / maximum-pool-size（/actuator/metapool），或排查任务变慢的原因。
+            注意若配的是无界队列，maximum-pool-size 不会生效，此时应先改为有界队列。
+
+      # ── 5. 线程池队列积压：领先指标，先于拒绝出现 ──
+      - alert: ExecutorQueueBacklog
+        expr: metapool_executor_queue_size > 0 and metapool_executor_active >= metapool_executor_pool_size
+        for: 5m
+        labels:
+          severity: warning
+          category: executor
+        annotations:
+          summary: "MetaPool 线程池队列持续积压"
+          description: >
+            线程池 {{ $labels.metapool_resource }} 已 5 分钟队列非空且线程全忙（当前队列 {{ $value }}）。
+            这是「快要撑不住」的领先指标——等 rejected 曲线起来时任务已经在丢了。
+
+      # ── 6. 🔴 分布式锁租约到期：可能已有两个进程同时进临界区 ──
+      # 这是 redisson 适配器最该被盯住的一条。MetaPool 的 DistributedLock 要求 leaseTime 必填，
+      # 因而 Redisson 的看门狗不启用（不自动续期）；业务跑过租约就会被别人抢走锁，
+      # 而契约又不提供 fencing token，下游无法拒绝过期持有者的迟到写入。
+      # 详见 docs/design/adapter-redisson.md。
+      - alert: LockLeaseExpired
+        expr: sum by (metapool_resource) (rate(metapool_lock_lease_expired_total[5m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: lock
+        annotations:
+          summary: "MetaPool 分布式锁租约到期 — 临界区可能已被并发进入"
+          description: >
+            锁 {{ $labels.metapool_resource }} 出现租约到期：业务执行时间超过了 leaseTime，
+            锁已自动释放，另一进程可能已持有同一把锁。正常情况下该值应恒为 0。
+            处置：调大 leaseTime（建议为业务耗时的 3~5 倍）或缩短临界区；
+            若临界区无法缩短且不能容忍并发，应改用存储层互斥（唯一约束 / 乐观锁版本号）。
+
+      # ── 7. 分布式锁竞争激烈：大量获取超时 ──
+      - alert: LockAcquireTimeoutHigh
+        expr: sum by (metapool_resource) (rate(metapool_lock_timeout_total[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          category: lock
+        annotations:
+          summary: "MetaPool 分布式锁获取超时频繁"
+          description: >
+            锁 {{ $labels.metapool_resource }} 在过去 5 分钟平均每秒超过 0.5 次获取失败。
+            要么临界区太长，要么锁粒度太粗（考虑按更细的 key 拆分）。
+
+      # ── 8. 对象池耗尽：借光且有人排队 ──
+      - alert: ObjectPoolExhausted
+        expr: metapool_object_pending > 0 and metapool_object_idle == 0
+        for: 2m
+        labels:
+          severity: warning
+          category: object
+        annotations:
+          summary: "MetaPool 对象池耗尽 — 有线程在排队等待借出"
+          description: >
+            对象池 {{ $labels.metapool_resource }} 已 2 分钟无空闲对象且有 {{ $value }} 个等待者。
+            处置：热调 max-total（/actuator/metapool），或排查是否有对象借出后未归还
+            （对照看板上 borrowed / released 两条速率曲线是否分叉）。
