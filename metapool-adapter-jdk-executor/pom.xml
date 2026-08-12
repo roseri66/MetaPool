@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.roseri66</groupId>
+        <artifactId>metapool-parent</artifactId>
+        <version>2.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>metapool-adapter-jdk-executor</artifactId>
+    <packaging>jar</packaging>
+
+    <name>MetaPool Adapter :: JDK Executor</name>
+    <description>把 JDK ThreadPoolExecutor 纳入 MetaPool 治理面的适配器（EXECUTOR 类型，非池资源）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!--
+            被包装的「成熟库」就是 JDK 自己的 java.util.concurrent.ThreadPoolExecutor —— 无外部依赖。
+            这是本适配器被选为 2.1 第一个 P1 适配器的原因之一：新接口的验证不被第三方库的问题干扰。
+        -->
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

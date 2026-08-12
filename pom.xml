@@ -40,6 +40,7 @@
         <module>metapool-core</module>
         <module>metapool-adapter-hikari</module>
         <module>metapool-adapter-bucket4j</module>
+        <module>metapool-adapter-jdk-executor</module>
         <module>metapool-spring-starter</module>
         <module>metapool-examples</module>
         <module>metapool-benchmark</module>
