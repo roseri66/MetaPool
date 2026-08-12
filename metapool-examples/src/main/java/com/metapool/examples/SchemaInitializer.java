@@ -27,6 +27,8 @@ class SchemaInitializer implements CommandLineRunner {
         Connection conn = ds.borrow();
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE TABLE IF NOT EXISTS orders (id VARCHAR(64) PRIMARY KEY)");
+            st.execute("CREATE TABLE IF NOT EXISTS order_audit ("
+                    + "seq BIGINT AUTO_INCREMENT PRIMARY KEY, order_id VARCHAR(64), worker VARCHAR(64))");
         } finally {
             ds.release(conn);
         }

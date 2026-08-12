@@ -14,6 +14,14 @@ metapool:
       limit-for-period: 5          # demo：每秒 5 个，便于观察限流
       refill-period: 1s
       tunable: [limit-for-period]
+  executors:
+    order-worker:
+      core-pool-size: 2
+      maximum-pool-size: 4
+      queue-capacity: 50           # ⚠️ 必须有界，否则 maximum-pool-size 永远不生效（见适配器类注释）
+      keep-alive: 60s
+      rejection-policy: abort      # 饱和时透传 JDK 的 RejectedExecutionException，不包装
+      tunable: [core-pool-size, maximum-pool-size]
 
 # 注意：为了 demo 开箱即跑，这里把 metapool 端点直接暴露且未加认证。
 # metapool 端点含 @WriteOperation（热调参），生产环境务必用 Spring Security 保护

@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>MetaPool Examples</name>
-    <description>可运行的 Spring Boot 示例：同时纳管 datasource + rate-limiter，暴露 /actuator/metapool 与 Prometheus</description>
+    <description>可运行的 Spring Boot 示例：同时纳管 datasource + rate-limiter + executor，暴露 /actuator/metapool 与 Prometheus</description>
 
     <properties>
         <!-- 示例应用不发布到 Maven Central -->
@@ -36,6 +36,11 @@
         <dependency>
             <groupId>io.github.roseri66</groupId>
             <artifactId>metapool-adapter-bucket4j</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-adapter-jdk-executor</artifactId>
             <version>${project.version}</version>
         </dependency>
 

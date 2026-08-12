@@ -1,6 +1,7 @@
 package com.metapool.starter;
 
 import com.metapool.common.manager.ResourceManager;
+import com.metapool.common.resource.ResourceTypes;
 import com.metapool.common.spi.ResourceDefinition;
 import com.metapool.core.DefaultResourceManager;
 import com.metapool.core.ResourceAdapterLoader;
@@ -47,10 +48,13 @@ public class MetaPoolAutoConfiguration {
         DefaultResourceManager manager = new DefaultResourceManager();
         ResourceAdapterLoader loader = new ResourceAdapterLoader();
 
+        // 用 ResourceTypes 常量而非字面量 —— 该类的存在意义就是「避免各处硬编码类型字符串」
         props.getDatasources().forEach((name, raw) ->
-                manager.register(loader.create(toDefinition(name, "datasource", raw))));
+                manager.register(loader.create(toDefinition(name, ResourceTypes.DATASOURCE, raw))));
         props.getRateLimiters().forEach((name, raw) ->
-                manager.register(loader.create(toDefinition(name, "rate-limiter", raw))));
+                manager.register(loader.create(toDefinition(name, ResourceTypes.RATE_LIMITER, raw))));
+        props.getExecutors().forEach((name, raw) ->
+                manager.register(loader.create(toDefinition(name, ResourceTypes.EXECUTOR, raw))));
 
         meterRegistries.ifAvailable(manager::bindMetrics);
         manager.start();
