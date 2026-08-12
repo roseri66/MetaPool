@@ -3,7 +3,7 @@
 > 本文件是 MetaPool 的**唯一规范入口**：协作方式、工程约定、构建/发布纪律，以及**踩坑台账**。
 > 规则：**每踩一个坑，必须当场追加到第七节「踩坑台账」**，不允许只在会话里口头说完就算。
 > 相关：需求与设计见 `docs/design/`，发布流程见 `docs/PUBLISHING.md`，跨会话上下文见 `../项目记忆.md`。
-> 最后更新：2026-07-26（新增 P-08 ~ P-18，来自 2.0.1 全量 review）
+> 最后更新：2026-08-12（新增 P-19 / P-20，来自 2.1 第一个 P1 适配器 jdk-executor）
 
 ---
 
@@ -49,7 +49,9 @@
 ## 4. 测试规则
 
 1. 每个新能力至少一条测试；**修一个 bug 必须补一条会失败的回归测试**。
-2. 合入前 `mvn clean test` 必须全绿。当前基线：**41 个测试**（+1 个 Testcontainers PG 用例在无 Docker 时自动跳过）。
+2. 合入前 `mvn clean test` 必须全绿。当前基线：**68 个测试通过 + 1 跳过**
+   （跳过的是 Testcontainers PG 用例，无 Docker 时自动跳过；2026-08-12 随 jdk-executor 适配器从 41 提升，
+   实测 `mvn -B clean verify` 汇总）。
    改动基线数字时必须是实测值（`Tests run` 汇总），不许估。
 3. 依赖外部环境的集成测试必须**可跳过**，不得阻塞无 Docker 的构建。
 4. 不为了凑数写空断言测试；测试数量对外报告时按实测。
@@ -68,7 +70,10 @@
 3. 发布走父 pom 的 `release` profile：`mvn -Prelease clean deploy`，再到 central.sonatype.com → Deployments → Publish。详见 `docs/PUBLISHING.md`。
 4. `central-publishing-maven-plugin` 锁 **0.11.0**（0.7.0 有 warnings 字段解析 bug）。
 5. 发布后打 tag、建 GitHub Release，并把 `main` 推进到下一个 `-SNAPSHOT`。
-6. commit 尾注沿用现有格式（`Co-Authored-By` + `Claude-Session`）。未经要求不 commit、不 push。
+6. **commit message 不带任何 AI 尾注**（`Co-Authored-By`、`Claude-Session` 等）。
+   2026-07-29 已用 `git filter-repo` 从全部 50 个 commit 里清除过一次，代价是 GitHub Actions
+   运行历史随孤儿 commit 归零、badge 一度变灰（详见 `../项目记忆.md` 第十二节）。**别再写回去。**
+   未经要求不 commit、不 push。
 7. **类库模块的 `src/main/resources` 根目录只允许放带命名空间的文件**（如 `META-INF/...`）。
    任何会被框架按约定名自动拾取的配置（`logback-spring.xml`、`application.yml`、`banner.txt` 等）
    一律不许打进类库 jar —— 它会劫持使用方应用的配置（见坑 P-08）。
@@ -115,8 +120,11 @@
   - Git Bash：`export JAVA_HOME='/c/Program Files/ojdkbuild/java-17-openjdk-17.0.3.0.6-1'`
 - **⚠️ 2026-07-26 复发**：AI 侧每条命令都显式带了 JAVA_HOME 所以一路绿，人在自己终端里跑 `mvn -Prelease clean deploy` 就炸。两个教训：
   ① `PUBLISHING.md` 原先只给了 bash 的 `export` 形式，而本机默认终端是 PowerShell —— **文档给命令必须匹配实际用的 shell**，已补两种形式；
-  ② 「构建前记得设环境变量」是纯手工约定，且失败信息（「无效的目标发行版: 17」）完全不提 JDK 版本，靠人记不住。**根治办法是让构建自己检查并给出可读报错**（maven-enforcer-plugin 的 `requireJavaVersion`），待办。
-- **日期**：2026-07（2026-07-26 复发并加强）
+  ② 「构建前记得设环境变量」是纯手工约定，且失败信息（「无效的目标发行版: 17」）完全不提 JDK 版本，靠人记不住。**根治办法是让构建自己检查并给出可读报错**。
+- **✅ 已根治**：父 pom 配了 maven-enforcer-plugin 3.5.0 的 `requireJavaVersion [17,)`（`validate` 阶段），
+  JDK 不对时直接给出可读报错并指回本条。报错文案**刻意写成纯 ASCII 英文**——它只在「跑错 JDK」时出现，
+  而那时往往正是 JDK 8 + GBK 控制台，中文会变乱码。
+- **日期**：2026-07（2026-07-26 复发并加强；2026-07-26 加 enforcer 根治）
 
 ### P-04 `mvn versions:set` 在这台机器上会挂住
 - **现象**：改版本号命令长时间无输出（插件解析极慢）。
@@ -207,3 +215,33 @@
 - **原因**：`repackage` 的默认执行来自 `spring-boot-starter-parent` 的 pluginManagement；本项目用自己的父 pom，只声明插件不会带上该 execution。
 - **修法**：显式声明 `<executions><execution><goals><goal>repackage</goal>`。修复后产出 28.9MB 可执行 jar。（文档推荐的 `mvn spring-boot:run` 一直可用，所以这个坑藏了很久。）
 - **日期**：2026-07-26
+
+### P-19 `ThreadPoolExecutor` 两个 size 的 setter 各自校验，逐个应用会炸在中间态
+- **现象**：一个调参 patch 同时带 `core-pool-size` 和 `maximum-pool-size` 时，`apply()` 抛出裸的
+  `java.lang.IllegalArgumentException`，线程池被改了一半。
+- **原因**：`setCorePoolSize` 与 `setMaximumPoolSize` **各自**都校验 `core <= max`。
+  当前 core=1/max=2，要调到 core=4/max=4：先设 core 时 `4 > 2` 立即抛异常。缩容方向对称地成立
+  （先设 max 时 `1 < 4` 同样抛）。**注意 `Map.of()` 的迭代顺序是未定义的**，
+  所以「碰巧顺序对了」不构成正确性，必须由实现显式排序。
+- **修法**：① 先把整组目标值算出来并整体校验，非法则**整组拒绝**，绝不留下半成品线程池；
+  ② 应用顺序随方向变化 —— **扩容先抬 max 再抬 core，缩容先降 core 再降 max**。
+  **防复发**：`tune_bothSizesInOnePatch_appliesInSafeOrder` 覆盖两个方向。
+  已用探针实测确认该测试是承重的：把排序改回固定顺序后，它与 `tune_survivesRestart_perPitfallP15`
+  两条立即以 `IllegalArgumentException` 报错。
+- **通用教训**：包装成熟库做「批量调参」时，凡底层是**多个互相约束的独立 setter**，
+  就必须自己定义中间态安全的应用顺序 —— 底层库只保证每一步的合法性，不保证你这一批的原子性。
+- **日期**：2026-08-12
+
+### P-20 `SynchronousQueue.remainingCapacity()` 恒为 0，只看队列会把健康判断带偏
+- **现象**：设计线程池 `health()` 时，若按「队列剩余容量为 0 ⇒ 饱和 ⇒ DEGRADED」判断，
+  所有 `queue-capacity: 0`（直接交接型）线程池将**永远**报 DEGRADED，哪怕一个任务都没有。
+- **原因**：`SynchronousQueue` 不存元素，其 `remainingCapacity()` 按契约恒返回 0，`size()` 恒返回 0。
+  这个 0 表示「本来就没有容量」，不表示「满了」——同一个数字，两种含义。
+- **修法**：饱和判据必须叠加线程维度：`queue.remainingCapacity() == 0 && poolSize >= maximumPoolSize`。
+  **防复发**：`health_isUp_forIdleSynchronousQueueExecutor` 直接断言空闲直接交接型线程池为 UP。
+- **诚实说明**：本条是**设计期识别并直接规避**的，不是线上踩出来的；记进台账是因为
+  下一个 adapter（Netty / commons-pool2）同样要写 `health()`，容易重犯。
+- **通用教训**：把底层库的某个数值当健康信号前，先问「这个值的 0 / 最大值是不是有第二种含义」。
+  `ExecutorStats.queueRemainingCapacity` 的 javadoc 早就为无界队列约定了 `Integer.MAX_VALUE`，
+  是同一类问题的另一面。
+- **日期**：2026-08-12
