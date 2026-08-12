@@ -61,9 +61,9 @@ $env:JAVA_HOME = "C:\Program Files\ojdkbuild\java-17-openjdk-17.0.3.0.6-1"
 #    先验一句，必须显示 17.x 才继续：
 mvn -v
 
-# 1. 去掉 -SNAPSHOT，定版（如 2.0.1）
+# 1. 去掉 -SNAPSHOT，定版（下面以 2.1.0 为例）
 #    注意：不要用 mvn versions:set —— 本机插件解析会挂住（P-04），用 sed 直接替换
-sed -i 's|<version>2.1.0-SNAPSHOT</version>|<version>2.0.1</version>|g' pom.xml metapool-*/pom.xml
+sed -i 's|<version>.*-SNAPSHOT</version>|<version>2.1.0</version>|g' pom.xml metapool-*/pom.xml
 grep -rn SNAPSHOT pom.xml metapool-*/pom.xml    # 应无输出
 
 # 2. 先本地验一遍产物（跳过签名，避免 GPG 交互）：测试全绿 + source/javadoc jar 能出
@@ -78,24 +78,32 @@ mvn -Prelease clean deploy
 发布确认后收尾：
 
 ```bash
-git tag -a v2.0.1 -m "MetaPool 2.0.1"          # 打 tag
+git tag -a v2.1.0 -m "MetaPool 2.1.0"          # 打 tag
+git push origin v2.1.0
 # GitHub 建 Release，正文取 CHANGELOG.md 对应小节
 
-# 回到下一个开发周期
-sed -i 's|<version>2.0.1</version>|<version>2.1.0-SNAPSHOT</version>|g' pom.xml metapool-*/pom.xml
-git commit -am "chore: begin next dev cycle — 2.1.0-SNAPSHOT"
+# 回到下一个开发周期（走 Actions 发布时 main 一直是 SNAPSHOT，这步只在本地发布后需要）
+sed -i 's|<version>2.1.0</version>|<version>2.2.0-SNAPSHOT</version>|g' pom.xml metapool-*/pom.xml
+git commit -am "chore: begin next dev cycle — 2.2.0-SNAPSHOT"
 ```
 
-发布的构件（`metapool-bom` 与各库；`metapool-examples` / `metapool-benchmark` 已设 `maven.deploy.skip`）：
+发布的构件共 **9 个**（`metapool-examples` / `metapool-benchmark` 已设 `maven.deploy.skip`，不上传）：
 
-| 构件 | 用途 |
-|---|---|
-| `io.github.roseri66:metapool-bom` | 物料清单，import 后统一对齐版本 |
-| `io.github.roseri66:metapool-common` | 契约层 |
-| `io.github.roseri66:metapool-core` | 控制面实现 |
-| `io.github.roseri66:metapool-adapter-hikari` | HikariCP 适配器 |
-| `io.github.roseri66:metapool-adapter-bucket4j` | Bucket4j 适配器 |
-| `io.github.roseri66:metapool-spring-starter` | Spring Boot Starter |
+| 构件 | 用途 | 起始版本 |
+|---|---|---|
+| `io.github.roseri66:metapool-bom` | 物料清单，import 后统一对齐版本 | 2.0.0 |
+| `io.github.roseri66:metapool-common` | 契约层 | 2.0.0 |
+| `io.github.roseri66:metapool-core` | 控制面实现 | 2.0.0 |
+| `io.github.roseri66:metapool-adapter-hikari` | HikariCP 适配器（`datasource`） | 2.0.0 |
+| `io.github.roseri66:metapool-adapter-bucket4j` | Bucket4j 适配器（`rate-limiter`） | 2.0.0 |
+| `io.github.roseri66:metapool-adapter-jdk-executor` | JDK 线程池适配器（`executor`） | **2.1.0** |
+| `io.github.roseri66:metapool-adapter-redisson` | Redisson 分布式锁适配器（`lock`） | **2.1.0** |
+| `io.github.roseri66:metapool-adapter-commons-pool2` | Commons Pool2 对象池适配器（`object`） | **2.1.0** |
+| `io.github.roseri66:metapool-spring-starter` | Spring Boot Starter | 2.0.0 |
+
+> 加了新 adapter 模块后，**记得回来更新这张表** —— 它是「这次到底发了什么」的唯一清单。
+> 核对办法：`mvn -Prelease clean package -Dgpg.skip=true` 之后看哪些模块产出了
+> `*-sources.jar` / `*-javadoc.jar`。
 
 ## 使用方引入（发布后）
 
