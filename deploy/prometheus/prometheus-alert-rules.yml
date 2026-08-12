@@ -1,12 +1,18 @@
 # ============================================================
-# MetaPool — Prometheus 告警规则（2.1）
+# MetaPool — Prometheus 告警规则（2.4，覆盖全部六类资源）
 # 基于治理控制面实际导出的指标：
 #   metapool_datasource_* / metapool_ratelimiter_* / metapool_executor_*
-#   metapool_lock_*       / metapool_object_*
+#   metapool_lock_*       / metapool_object_*      / metapool_redis_*  / metapool_memory_*
 #
-# 口径统一：只在「有人受影响」时才告警，光是资源用满不算故障——
-# 连接池借满、线程池线程跑满、对象池借光，都可能正是它在满负荷工作。
-# 因此饱和类告警一律要求「同时有等待者 / 已产生拒绝」。
+# 两条贯穿始终的口径：
+#
+# 1. 只在「有人受影响」时才告警。资源用满不算故障 —— 连接池借满、线程池跑满、对象池借光，
+#    都可能正是它在满负荷工作。所以饱和类一律要求「同时有等待者 / 已产生拒绝」。
+#
+# 2. 重点盯【底层库替你隐藏起来的问题】。这类问题不埋告警就基本不可能被发现：
+#    · LockLeaseExpired    锁被悄悄抢走（看门狗被禁用的直接后果）
+#    · RedisReconnecting   自动重连掩盖了网络抖动，业务只觉得「偶尔慢一下」
+#    · OffHeapBufferLeak   堆外泄漏不占堆、GC 管不着，不 OOM 就没人知道
 #
 # ⚠️ 新增 adapter 后记得回来补规则：指标有了而告警没跟上，等于白埋点。
 # ============================================================
@@ -143,7 +149,26 @@ groups:
             Redis 资源 {{ $labels.metapool_resource }} 的连接持续 5 分钟处于断开状态，
             自动重连没能恢复它。此时 MetaPool 的健康状态为 DEGRADED（若关闭了 auto-reconnect 则为 DOWN）。
 
-      # ── 10. 对象池耗尽：借光且有人排队 ──
+      # ── 10. 🔴 堆外内存疑似泄漏：借出与释放的速率持续不匹配 ──
+      # 堆外泄漏不占堆、GC 管不着，不 OOM 就没人知道。这条告警就是为了让它当天可见。
+      # 判据用速率差而不是绝对数：短时间的借多还少是正常的（buf 正在被使用）。
+      - alert: OffHeapBufferLeak
+        expr: >
+          sum by (metapool_resource) (rate(metapool_memory_allocated_total[10m]))
+          - sum by (metapool_resource) (rate(metapool_memory_released_total[10m])) > 0.1
+        for: 15m
+        labels:
+          severity: critical
+          category: memory
+        annotations:
+          summary: "MetaPool 堆外内存疑似泄漏 —— 借出与释放持续不匹配"
+          description: >
+            内存池 {{ $labels.metapool_resource }} 在过去 15 分钟里，ByteBuf 的分配速率持续高于释放速率。
+            这几乎总是意味着某条代码路径忘了 release（注意 Netty 的 release 是引用计数减一，
+            retain() 过的 buf 需要对应次数的 release）。
+            排查：对照看板上 allocated / released 两条曲线的分叉起点，定位那个时间点上线的改动。
+
+      # ── 11. 对象池耗尽：借光且有人排队 ──
       - alert: ObjectPoolExhausted
         expr: metapool_object_pending > 0 and metapool_object_idle == 0
         for: 2m

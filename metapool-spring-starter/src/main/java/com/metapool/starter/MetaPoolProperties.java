@@ -93,6 +93,9 @@ public class MetaPoolProperties {
     /** Redis 连接（type=redis），名称 → 直通 Lettuce 的属性。 */
     private Map<String, Map<String, Object>> redis = new LinkedHashMap<>();
 
+    /** 堆外内存池（type=memory），名称 → 直通 Netty 的属性。 */
+    private Map<String, Map<String, Object>> memory = new LinkedHashMap<>();
+
     /**
      * 通用分段：<b>类型 → 名称 → 属性</b>。类型任意，包括第三方经 SPI 扩展的类型。
      *
@@ -155,6 +158,14 @@ public class MetaPoolProperties {
 
     public void setRedis(Map<String, Map<String, Object>> redis) {
         this.redis = redis;
+    }
+
+    public Map<String, Map<String, Object>> getMemory() {
+        return memory;
+    }
+
+    public void setMemory(Map<String, Map<String, Object>> memory) {
+        this.memory = memory;
     }
 
     public Map<String, Map<String, Map<String, Object>>> getResources() {

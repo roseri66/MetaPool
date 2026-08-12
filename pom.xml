@@ -44,6 +44,7 @@
         <module>metapool-adapter-redisson</module>
         <module>metapool-adapter-commons-pool2</module>
         <module>metapool-adapter-lettuce</module>
+        <module>metapool-adapter-netty</module>
         <module>metapool-spring-starter</module>
         <module>metapool-examples</module>
         <module>metapool-benchmark</module>
@@ -173,6 +174,17 @@
                 <version>${jmh.version}</version>
                 <scope>test</scope>
             </dependency>
+
+            <!--
+                Netty（metapool-adapter-netty 用）在这里【刻意不出现】：
+                spring-boot-dependencies 已经 import 了 netty-bom，版本由它统一管，
+                子模块直接声明 io.netty:netty-buffer 不写 version 即可。
+
+                ⚠️ 别在这里补一条不带 version 的 dependencyManagement 条目 ——
+                那不是「沿用 BOM」，而是把 BOM 管的版本覆盖成空，构建会直接报
+                'dependencies.dependency.version' is missing（2026-08-13 踩过）。
+                自设版本同样不行：redisson / lettuce 都在传递 netty，三者必须同版本（P-16）。
+            -->
 
             <!-- Lettuce：metapool-adapter-lettuce 的编译期依赖 -->
             <dependency>

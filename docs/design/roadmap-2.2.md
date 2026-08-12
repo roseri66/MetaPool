@@ -130,7 +130,9 @@
 
 | 项 | 判断 |
 |---|---|
-| `adapter-netty`（memory） | 堆外内存释放安全性要谨慎，收益主要是「谱系完整」。**推迟** |
+| ~~`adapter-netty`（memory）~~ | ✅ **2.4.0 已做**。当初判「推迟」是因为看不到「谱系完整」以外的收益；
+后来找到了真收益：**让堆外泄漏当天可见**（allocated/released 两条曲线一分叉就是漏 release）。
+设计见 [`adapter-netty.md`](adapter-netty.md) |
 | Micrometer Observation / Tracing | 只有接了链路追踪后端才有意义。**不做** |
 | 注解式配置 `@MetaPoolDataSource` | 2.0 已判「YAML 够用」。**不做**，避免过度设计 |
 | jacoco 覆盖率上报 | 2.1 已判「要引入外部账号，与『优先简单稳定』冲突」。**维持不做** |

@@ -964,6 +964,182 @@
           "legendFormat": "{{metapool_resource}} · exceptions"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Off-heap memory (Netty ByteBuf)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Allocated vs Released (per second)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 55
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_memory_allocated_total[5m]))",
+          "legendFormat": "{{metapool_resource}} · allocated"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (metapool_resource) (rate(metapool_memory_released_total[5m]))",
+          "legendFormat": "{{metapool_resource}} · released"
+        }
+      ],
+      "description": "🔴 **两条曲线应当基本重合。**\n\n持续分叉 = 有 ByteBuf 被借出后没有 release —— 那是**堆外内存泄漏**：它不占堆、GC 管不着，**不 OOM 就没人知道**。\n\n这块面板的意义就是把这个原本完全不可见的问题变成当天可见。"
+    },
+    {
+      "type": "timeseries",
+      "title": "Outstanding buffers",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 55
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*leaked.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_memory_outstanding{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · outstanding"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (metapool_resource) (metapool_memory_leaked_total)",
+          "legendFormat": "{{metapool_resource}} · leaked (cumulative)"
+        }
+      ],
+      "description": "当前借出未释放的 ByteBuf 数量。\n\n口径说明：这是**近似值** —— 调用方 retain() 之后由别处 release 的，适配器观测不到。\n\n注意 Netty 的 release() 是**引用计数减一**，不是「还给池」：retain 过的 buf 要对应次数的 release 才真回池。"
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory in use",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 55
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_memory_used_direct_bytes{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · direct"
+        },
+        {
+          "refId": "B",
+          "expr": "metapool_memory_used_heap_bytes{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · heap"
+        }
+      ]
     }
   ]
 }

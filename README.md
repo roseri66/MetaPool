@@ -230,6 +230,7 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 | `metapool-adapter-redisson` | 把 Redisson 分布式锁纳入治理（`lock`，非池资源，**不实现 `Tunable`**） |
 | `metapool-adapter-commons-pool2` | 把 Commons Pool2 通用对象池纳入治理（`object`，**真·池**） |
 | `metapool-adapter-lettuce` | 把 Lettuce Redis 连接纳入治理（`redis`，**刻意不实现 `Pool`**——单连接多路复用没有借还语义） |
+| `metapool-adapter-netty` | 把 Netty 池化堆外内存纳入治理（`memory`，**实现 `Pool` 但 `release` 是引用计数减一**） |
 | `metapool-spring-starter` | Spring Boot 自动装配 + Actuator health/tune 端点 |
 
 ## 扩展新资源类型
@@ -238,7 +239,10 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 
 **这不是宣传语，是可核验的事实**：加入 `metapool-adapter-jdk-executor` 时，`metapool-core` 与 `metapool-common` **零改动**（`git show 8685ee3 --stat` 可查）。
 
-规划中的适配器：Netty（memory）。
+**六类资源的适配器谱系已完整。** 其中两个相反的判断最能说明这套设计：
+Redis 适配器**不**实现 `Pool`（多路复用没有借还这回事），Netty 适配器**实现** `Pool`
+但在 javadoc 里写明 `release` 是引用计数减一 ——
+**「语义更强」可以映射并注明，「语义不存在」只能靠撒谎才能映射。**
 
 **第三方类型也能用 YAML 声明**（2.1 起）：
 
@@ -275,7 +279,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 2.1 P0 | GitHub Actions CI + `DistributedLock` / `ManagedExecutor` 能力接口 | ✅ |
-| 2.1–2.3 | 适配器谱系：`executor` / `lock` / `object` / `redis` 已落地，memory 待做（见 [2.2 路线图](docs/design/roadmap-2.2.md)） | 🚧 |
+| 2.1–2.4 | 适配器谱系**已完整**：`datasource` / `rate-limiter` / `executor` / `lock` / `object` / `redis` / `memory` | ✅ |
 | 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.3.0`，10 个构件（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 | CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 

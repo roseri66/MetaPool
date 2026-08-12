@@ -4,6 +4,57 @@
 
 ---
 
+## [未发布] 2.4.0
+
+无破坏性变更。**适配器谱系至此完整**（七种资源类型、六个适配器模块）。
+
+### 新增
+
+- **`metapool-adapter-netty`**：把 Netty 的池化堆外内存纳入治理（类型 `memory`）。核心零改动。
+  设计全文见 [`docs/design/adapter-netty.md`](docs/design/adapter-netty.md)。
+
+  它**实现 `Pool<ByteBuf>`**，与上一版 lettuce 适配器的结论相反 —— 判据是一句话：
+  **「语义更强」和「语义不存在」是两回事。** Netty 确实存在 borrow/release 这个动作，
+  只是 `release()` 是**引用计数减一**（到 0 才真回池）；而 Lettuce 的多路复用连接根本没有这个动作。
+  前者可以映射并在文档写清，后者只能靠撒谎才能映射。
+
+  ⚠️ **使用方必须知道**：`release()` 不是「还给池」。`retain()` 过的 buf 需要对应次数的
+  `release()`。忘了 release 的后果也和普通池不同 —— 普通池会耗尽报错（能发现），
+  堆外内存则是**静默泄漏**，GC 不管，OOM 之前无声无息。
+
+- **starter 支持 `metapool.memory.*` YAML 声明。**
+
+### 行为说明
+
+- 🎯 **导出泄漏信号**：`metapool.memory.allocated.total` 与 `released.total`
+  **两条曲线一分叉就说明有人忘了 release**。堆外泄漏平时完全不可见（不占堆、GC 管不着），
+  这块面板与配套的 `OffHeapBufferLeak` 告警把它变成当天可见。
+- **停机时不替调用方 release**：仍未释放的 buf 只记 WARN 并计入 `leaked.total`。
+  那块内存可能正被别处使用（`retain()` 过），强行释放会造成 use-after-free ——
+  **比泄漏更危险**。
+- **健康只有 UP / DOWN，刻意没有 DEGRADED**：内存分配器不存在「饱和但仍在工作」的中间态，
+  要么分配成功要么直接 OOM。为「看起来一致」而硬造三态是在制造假象。
+- **`borrow(Duration)` 在本适配器上忽略超时**：内存分配不排队。至此该方法在本项目有三种
+  语义强度（Pool2 真超时 / Hikari 以配置为界 / netty 忽略），三边 javadoc 均已写明。
+- **`poolStats()` 的 `idle` 与 `pending` 恒为 0**：Netty 的池按 arena/chunk 组织，
+  没有可数的空闲对象；分配也不排队。有测试钉住，防止后来者补一个编造的数字。
+
+### 工程
+
+- **新增使用方冒烟测试**（`smoke-consumer/` + `consumer-smoke.yml` workflow）：
+  以外部使用方身份**只从 Maven Central 解析依赖**，验证 README 承诺的四件事真的成立。
+  它回答的问题与 CI 不同 —— CI 编译本仓库源码（我写的代码对不对），
+  冒烟拉已发布的 jar（我发出去的东西别人能不能用）。**这两件事不等价**：2.0.0 就发生过
+  仓库里一切正常、但打进 starter 的 `logback-spring.xml` 让所有使用方日志静默消失（P-08）。
+  已列入 `PUBLISHING.md` 的发布流程。
+- **README 补上 `micrometer-registry-prometheus`**：快速开始此前漏了它，
+  照抄的人去看指标会 404 —— 而「一个看板看全部」正是 README 首屏的头牌卖点。
+  这个缺口正是上面那次使用方试用发现的。
+- 台账新增 P-24（`@SpringBootTest` 默认关闭 metrics 导出，导致 `/actuator/prometheus`
+  在测试里 404，极易被误读成指标坏了）。
+
+---
+
 ## [2.3.0] — 2026-08-13
 
 无破坏性变更。

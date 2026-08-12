@@ -100,7 +100,7 @@ sed -i 's|<version>2.3.0</version>|<version>2.2.0-SNAPSHOT</version>|g' pom.xml 
 git commit -am "chore: begin next dev cycle — 2.2.0-SNAPSHOT"
 ```
 
-发布的构件共 **10 个**（`metapool-examples` / `metapool-benchmark` 已设 `maven.deploy.skip`，不上传）：
+发布的构件共 **11 个**（`metapool-examples` / `metapool-benchmark` 已设 `maven.deploy.skip`；`smoke-consumer` 不在 reactor 里，均不上传）：
 
 | 构件 | 用途 | 起始版本 |
 |---|---|---|
@@ -113,6 +113,7 @@ git commit -am "chore: begin next dev cycle — 2.2.0-SNAPSHOT"
 | `io.github.roseri66:metapool-adapter-redisson` | Redisson 分布式锁适配器（`lock`） | **2.1.0** |
 | `io.github.roseri66:metapool-adapter-commons-pool2` | Commons Pool2 对象池适配器（`object`） | **2.1.0** |
 | `io.github.roseri66:metapool-adapter-lettuce` | Lettuce Redis 适配器（`redis`，不实现 `Pool`） | **2.3.0** |
+| `io.github.roseri66:metapool-adapter-netty` | Netty 堆外内存适配器（`memory`） | **2.4.0** |
 | `io.github.roseri66:metapool-spring-starter` | Spring Boot Starter | 2.0.0 |
 
 > 加了新 adapter 模块后，**记得回来更新这张表** —— 它是「这次到底发了什么」的唯一清单。

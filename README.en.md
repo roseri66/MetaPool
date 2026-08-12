@@ -230,6 +230,7 @@ is in [`docs/design/metapool-2.0.md`](docs/design/metapool-2.0.md) (Chinese).
 | `metapool-adapter-redisson` | Brings Redisson distributed locks under governance (`lock` — a non-pool resource; **does not implement `Tunable`**) |
 | `metapool-adapter-commons-pool2` | Brings Commons Pool2 generic object pools under governance (`object` — an actual pool) |
 | `metapool-adapter-lettuce` | Brings Lettuce Redis connections under governance (`redis` — **deliberately not a `Pool`**: a multiplexed connection has no borrow/return semantics) |
+| `metapool-adapter-netty` | Brings Netty's pooled off-heap buffers under governance (`memory` — **is a `Pool`, but `release` decrements a reference count**) |
 | `metapool-spring-starter` | Spring Boot auto-configuration + Actuator health/tune endpoints |
 
 ## Supporting a new resource type
@@ -259,7 +260,10 @@ never pad the surface to look complete. That is the exact inverse of 1.0, which 
 interface, forced every resource to implement it, and threw `UnsupportedOperationException` where
 the semantics did not fit.
 
-Planned adapters: Netty (memory).
+**The adapter lineage is complete.** Two opposite calls illustrate the design best:
+the Redis adapter is **not** a `Pool` (multiplexing has no borrow/return), while the Netty adapter
+**is** one but documents that `release` decrements a reference count —
+**"stronger semantics" can be mapped and documented; "no such semantics" can only be mapped by lying.**
 
 ---
 
@@ -303,7 +307,7 @@ unavailable it skips itself rather than failing the build.
 | Release | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ `2.3.0` on Maven Central, 10 artifacts |
 | CI | GitHub Actions: ubuntu + windows × JDK 17, plus a manual release workflow | ✅ |
 | 2.1 P0 | `DistributedLock` / `ManagedExecutor` capability interfaces | ✅ |
-| 2.1–2.3 | Adapter lineage: `executor`, `lock`, `object`, `redis` landed; memory to go — see the [2.2 roadmap](docs/design/roadmap-2.2.md) | 🚧 |
+| 2.1–2.4 | Adapter lineage **complete**: `datasource`, `rate-limiter`, `executor`, `lock`, `object`, `redis`, `memory` | ✅ |
 
 ## What this project is, and is not
 

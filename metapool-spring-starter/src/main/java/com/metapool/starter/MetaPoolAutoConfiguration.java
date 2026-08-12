@@ -77,6 +77,7 @@ public class MetaPoolAutoConfiguration {
         addAll(all, props.getLocks(), ResourceTypes.LOCK, "metapool.locks");
         addAll(all, props.getObjects(), ResourceTypes.OBJECT, "metapool.objects");
         addAll(all, props.getRedis(), ResourceTypes.REDIS, "metapool.redis");
+        addAll(all, props.getMemory(), ResourceTypes.MEMORY, "metapool.memory");
         // 通用分段：类型任意，第三方 SPI 扩展的类型也能声明式接入
         props.getResources().forEach((type, byName) -> {
             if (type == null || type.isBlank()) {
