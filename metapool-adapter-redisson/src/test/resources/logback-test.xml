@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    仅测试期生效（src/test/resources，不会进 jar —— 见坑 P-08：类库绝不能打包日志配置）。
+    打开 Testcontainers 的探测日志，便于诊断「明明装了 Docker 却仍然跳过集成测试」这类问题。
+-->
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+        INFO 就够：它会打出「Connected to docker: ...」或「Could not find a valid Docker environment」。
+        这一行是坑 P-22 的照妖镜 —— 那次 Testcontainers 连不上 Docker 却把测试静默跳过，
+        构建照样是绿的。要看详细的探测过程再临时调成 DEBUG。
+    -->
+    <logger name="org.testcontainers" level="INFO"/>
+
+    <root level="WARN">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

@@ -41,6 +41,7 @@
         <module>metapool-adapter-hikari</module>
         <module>metapool-adapter-bucket4j</module>
         <module>metapool-adapter-jdk-executor</module>
+        <module>metapool-adapter-redisson</module>
         <module>metapool-spring-starter</module>
         <module>metapool-examples</module>
         <module>metapool-benchmark</module>
@@ -68,6 +69,15 @@
         <bucket4j.version>8.9.0</bucket4j.version>
         <postgresql-driver.version>42.7.5</postgresql-driver.version>
         <testcontainers.version>1.20.6</testcontainers.version>
+        <!--
+            Testcontainers 内置的 docker-java 默认按 Docker API 1.32 发请求，而 Docker Engine 29.x
+            的最低 API 是 1.40 → /info 直接 400，Testcontainers 判定「没有 Docker」并把集成测试
+            **静默跳过**（构建仍是绿的，极易被误认为通过）。见坑 P-22。
+
+            取 1.40 而非更高：它同时是新引擎的下限与老引擎（19.03+）支持范围内的值，
+            两头都兼容，是最保守的选择。实测 1.21.3 也有同样问题，升版本解决不了，故未升。
+        -->
+        <docker.api.version>1.40</docker.api.version>
 
         <!-- 测试 -->
         <junit.version>5.11.4</junit.version>
@@ -75,6 +85,12 @@
         <jmh.version>1.37</jmh.version>
 
         <hikaricp.version>5.1.0</hikaricp.version>
+        <!--
+            Redisson 不在 spring-boot-dependencies 里，故自设版本（这不违反坑 P-16 ——
+            P-16 说的是「Boot BOM 已管的坐标别自设」）。它传递的 netty / jackson 仍由 Boot BOM 统一管，
+            升级 Redisson 时须复核这两族的最终版本没被拽偏。
+        -->
+        <redisson.version>3.35.0</redisson.version>
         <h2.version>2.2.224</h2.version>
 
         <!-- 插件 -->
@@ -147,6 +163,13 @@
                 <artifactId>jmh-generator-annprocess</artifactId>
                 <version>${jmh.version}</version>
                 <scope>test</scope>
+            </dependency>
+
+            <!-- Redisson：metapool-adapter-redisson 的编译期依赖 -->
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson</artifactId>
+                <version>${redisson.version}</version>
             </dependency>
 
             <!-- HikariCP：metapool-adapter-hikari 的编译期依赖 -->
@@ -234,6 +257,14 @@ See docs/RULES.md pitfall P-03 for the full story.
                         <excludes>
                             <exclude>**/*Benchmark*</exclude>
                         </excludes>
+                        <systemPropertyVariables>
+                            <!--
+                                告诉 Testcontainers 内置的 docker-java 用哪个 Docker API 版本。
+                                不设的话它默认 1.32，被 Docker Engine 29.x（最低 1.40）拒为 400，
+                                于是集成测试被静默跳过而构建仍然是绿的（坑 P-22）。
+                            -->
+                            <api.version>${docker.api.version}</api.version>
+                        </systemPropertyVariables>
                     </configuration>
                 </plugin>
                 <plugin>

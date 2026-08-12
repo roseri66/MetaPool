@@ -3,7 +3,7 @@
 > 本文件是 MetaPool 的**唯一规范入口**：协作方式、工程约定、构建/发布纪律，以及**踩坑台账**。
 > 规则：**每踩一个坑，必须当场追加到第七节「踩坑台账」**，不允许只在会话里口头说完就算。
 > 相关：需求与设计见 `docs/design/`，发布流程见 `docs/PUBLISHING.md`，跨会话上下文见 `../项目记忆.md`。
-> 最后更新：2026-08-12（新增 P-19 / P-20 / P-21，来自 2.1 第一个 P1 适配器 jdk-executor 及其接入面）
+> 最后更新：2026-08-12（新增 P-19 ~ P-22，来自 2.1 的 jdk-executor / redisson 两个 P1 适配器）
 
 ---
 
@@ -49,12 +49,19 @@
 ## 4. 测试规则
 
 1. 每个新能力至少一条测试；**修一个 bug 必须补一条会失败的回归测试**。
-2. 合入前 `mvn clean test` 必须全绿。当前基线：**70 个测试通过 + 1 跳过**
-   （跳过的是 Testcontainers PG 用例，无 Docker 时自动跳过；2026-08-12 随 jdk-executor 适配器
-   与其接入面从 41 提升，实测 `mvn -B clean verify` 汇总）。
+2. 合入前 `mvn clean test` 必须全绿。当前基线（2026-08-12 实测 `mvn -B clean verify` 汇总）：
+   - **有 Docker：92 通过 + 0 跳过**（本机装 Docker Desktop 后已实测达成）
+   - **无 Docker：84 通过 + 8 跳过**
+
+   那 8 条是需要真后端的集成测试：`HikariAdapterPostgresTest`（1，PG）与
+   `RedissonLockAdapterRedisTest`（7，Redis）。它们必须**可跳过而不使构建失败**，
+   但**不许因此不写**——互斥、租约到期这类语义不接真后端根本验不了。
    改动基线数字时必须是实测值（`Tests run` 汇总），不许估。
-3. 依赖外部环境的集成测试必须**可跳过**，不得阻塞无 Docker 的构建。
-4. 不为了凑数写空断言测试；测试数量对外报告时按实测。
+3. **报告测试结果时必须同时报「通过数」和「跳过数」。** 只说「构建绿了」不够：
+   Testcontainers 连不上 Docker 时会把集成测试**静默跳过**，而构建依旧 BUILD SUCCESS（坑 P-22）。
+   **跳过不等于通过。**
+4. 依赖外部环境的集成测试必须**可跳过**，不得阻塞无 Docker 的构建。
+5. 不为了凑数写空断言测试；测试数量对外报告时按实测。
 
 ## 5. 文档规则
 
@@ -258,4 +265,30 @@
 - **通用教训**：判断标准是「这个资源有没有状态」。MetaPool 治理的资源**大多有状态**
   （连接池、令牌桶、线程池、锁），所以凡在共享上下文里断言它们的行为，都要先想清楚谁污染谁。
   这条随资源类型变多只会更容易踩。
+- **日期**：2026-08-12
+
+### P-22 装了 Docker，Testcontainers 却仍把集成测试全部跳过，而构建照样是绿的
+- **现象**：本机装好 Docker Desktop（29.7.2）、`docker info` 正常、镜像也拉得下来，
+  但 `mvn verify` 里 8 条 Testcontainers 用例**依然全部 Skipped**。
+  最危险的是 **BUILD SUCCESS** —— 不看跳过数就会以为「集成测试通过了」。
+- **原因**：Testcontainers 内置的 docker-java 默认按 **Docker API 1.32** 发请求，
+  而 **Docker Engine 29.x 的最低 API 版本是 1.40**，于是 `/info` 返回 **400**。
+  `@Testcontainers(disabledWithoutDocker = true)` 把这个 400 理解成「本机没有 Docker」，
+  于是安静跳过。**报错信息里完全没有「版本」二字**，只有一坨字段全空的 Info JSON。
+- **排查路径**（下次直接照做）：
+  1. 打开 `org.testcontainers` 的日志（本模块已放 `src/test/resources/logback-test.xml`），
+     看它到底是「Connected to docker」还是「Could not find a valid Docker environment」；
+  2. `docker version --format '{{.Server.APIVersion}} {{.Server.MinAPIVersion}}'` 看服务端的版本区间；
+  3. 用 `mvn -Dapi.version=1.44 ...` 单次验证是不是版本问题。
+- **修法**：父 pom 的 surefire 配置里加
+  `<systemPropertyVariables><api.version>${docker.api.version}</api.version></systemPropertyVariables>`，
+  取值 **1.40**。选 1.40 是因为它同时是新引擎的下限与老引擎（19.03+）支持范围内的值，两头兼容；
+  钉 1.44 之类更高的值会在 Docker 24 及更早的 CI runner 上反过来挂掉。
+- **走过的弯路（记下来省得重走）**：
+  ① 以为是管道选错了 —— Docker Desktop 的 `docker_engine` 管道返回的 label 写着
+  `com.docker.desktop.address=npipe://\\.\pipe\docker_cli`，很像"要改指到别的管道"。
+  实测改成 `dockerDesktopLinuxEngine` **同样 400**，不是管道问题。
+  ② 以为升 Testcontainers 能解决 —— 实测 **1.21.3 完全一样**，故未升版本（不为升而升）。
+- **通用教训**：**「跳过」和「通过」是两件事，而构建输出里两者都是绿的。**
+  凡带可跳过集成测试的项目，都要定期确认那些用例**真的跑过**，别让一个绿勾骗了自己。
 - **日期**：2026-08-12
