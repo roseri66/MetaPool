@@ -1,6 +1,7 @@
 package com.metapool.examples;
 
 import com.metapool.common.manager.ResourceManager;
+import com.metapool.common.stats.HealthStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -54,6 +55,54 @@ class ExampleApplicationTest {
         mockMvc.perform(post("/orders/audit-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.audit").value("SUBMITTED"));
+    }
+
+    /**
+     * 故障演示端点的验收：把线程池打饱和 → 该资源与聚合健康都降级 → 释放后恢复。
+     *
+     * <p>这条测的不是「能打饱和」，而是<b>治理面看得见</b>：如果 health 不跟着变，
+     * 那个演示端点就只是个玩具。三段状态都断言，缺一不可。
+     */
+    @Test
+    void saturateEndpoint_degradesHealth_andReleaseRestoresIt() throws Exception {
+        assertEquals(HealthStatus.Status.UP, metaPool.get("order-worker").health().status());
+
+        mockMvc.perform(post("/demo/saturate/order-worker").param("seconds", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capability").value("ManagedExecutor"))
+                .andExpect(jsonPath("$.healthBefore").value("UP"))
+                .andExpect(jsonPath("$.healthAfter").value("DEGRADED"))
+                .andExpect(jsonPath("$.aggregateHealth").value("DEGRADED"));
+
+        // 聚合健康必须点名是谁降级了，否则运维还得自己翻日志
+        assertTrue(metaPool.health().detail().contains("order-worker"),
+                metaPool.health().detail());
+
+        mockMvc.perform(post("/demo/release/order-worker"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.health").value("UP"));
+
+        assertEquals(HealthStatus.Status.UP, metaPool.health().status(), "释放后聚合健康应恢复");
+    }
+
+    /** 同一个资源不允许并发两次饱和会话 —— 否则释放语义会含糊。 */
+    @Test
+    void saturate_isRejected_whileAlreadySaturated() throws Exception {
+        mockMvc.perform(post("/demo/saturate/order-worker").param("seconds", "10"))
+                .andExpect(status().isOk());
+        try {
+            mockMvc.perform(post("/demo/saturate/order-worker").param("seconds", "10"))
+                    .andExpect(status().isConflict());
+        } finally {
+            mockMvc.perform(post("/demo/release/order-worker"));
+        }
+    }
+
+    @Test
+    void saturate_unknownResource_returns404WithTheAvailableNames() throws Exception {
+        mockMvc.perform(post("/demo/saturate/nope"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.available").isArray());
     }
 
     /**

@@ -65,17 +65,30 @@
 
 ---
 
-## P0-B：examples 加故障演示端点 📋 待做
+## P0-B：examples 加故障演示端点 ✅ 已完成（2026-08-12）
 
 **动机**：examples 是面试时最可能被点开的东西。它现在能展示「能跑」，
 但展示不了 MetaPool 最有说服力的场景 —— **出问题的时候治理面怎么帮你**。
 
-**做什么**：加一个 `POST /demo/saturate?resource=order-worker`，故意把某个资源打饱和，
-让人在 Grafana 上看着曲线变红、health 从 UP 转 DEGRADED，再用 `/actuator/metapool`
-热调把它救回来。
+**做了什么**：`SaturationController`，三个端点 —— `POST /demo/saturate/{name}?seconds=N`、
+`POST /demo/release/{name}`、`GET /demo/saturation`。
 
-**验收**：这套动作能在 30 秒内演示完，且**每一步都有看板/端点上的可见变化**。
-把「统一治理」从一句口号变成一个能演的动作。
+**它按能力接口分派，不按类型字符串**：怎么打饱和取决于资源**有什么能力**
+（`ManagedExecutor` 塞满 / `Pool<T>` 借光 / `RateLimiter` 抽干），而不是它**是什么类型**。
+这段分派本身就是能力隔离的演示 —— 新增资源类型时它不需要认识你，只要实现了某个已知能力即可。
+
+**两处不显然的地方**：
+
+1. **池类资源光借光还不够，必须再制造一个排队者。** `HikariAdapter.health()` 的降级判据是
+   「无空闲 **且** 有人在等」——「借满」本身不是故障，那正是池在满负荷工作。
+   要演示降级就必须真有人排队，否则演示会静悄悄地什么都不发生。
+2. **限流器被抽干不会降级**，响应里为此专门带一句说明：拒绝流量正是它在履职，
+   该看的是指标（可用令牌归零、拒绝计数上涨）而不是健康状态。
+   宁可在响应里解释清楚，也不为了「演示效果」把它硬报成 DEGRADED。
+
+**验收**：`saturateEndpoint_degradesHealth_andReleaseRestoresIt` 断言三段状态
+（UP → DEGRADED（且聚合健康点名）→ 释放后 UP）。测的不是「能打饱和」，
+而是**治理面看得见** —— health 不跟着变，这个端点就只是个玩具。
 
 ---
 

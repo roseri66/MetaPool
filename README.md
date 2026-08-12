@@ -151,6 +151,34 @@ POST /actuator/metapool/main   {"key": "maximum-pool-size", "value": "40"}
 > （`management.server.port` + `management.server.address`）。示例应用为了开箱即跑没有加认证，
 > **不要直接照搬到生产**。
 
+### 30 秒看完「出问题 → 看见 → 救回来」
+
+光看正常曲线说明不了什么。examples 里有一个**故意打饱和**的演示端点：
+
+```bash
+# 1. 把线程池打满
+curl -XPOST 'localhost:8080/demo/saturate/order-worker?seconds=30'
+#    → {"capability":"ManagedExecutor","healthBefore":"UP","healthAfter":"DEGRADED",...}
+
+# 2. 治理面立刻看得见：聚合健康降级，并点名是谁
+curl localhost:8080/actuator/metapool          # 看板上队列深度曲线同时冲顶
+
+# 3. 不重启，热调救回来
+curl -XPOST localhost:8080/actuator/metapool/order-worker \
+     -H 'Content-Type: application/json' \
+     -d '{"key":"maximum-pool-size","value":"16"}'
+
+# 4. 提前释放
+curl -XPOST localhost:8080/demo/release/order-worker
+```
+
+对 `main`（连接池）同样有效：它会借光连接**并制造一个排队者**——因为「借满」本身不是故障，
+那正是池在满负荷工作，只有**有人排队等不到**才该降级。
+
+> 该端点按**能力接口**分派（`ManagedExecutor` / `Pool<T>` / `RateLimiter`），不认类型字符串：
+> 新增一种资源时它不需要认识你，只要你实现了某个已知能力就能被打饱和。
+> ⚠️ 仅在 examples 里，不在任何发布构件中。
+
 ### 本地起监控栈（Prometheus + Grafana）
 
 ```bash
