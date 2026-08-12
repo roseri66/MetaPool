@@ -63,7 +63,7 @@ mvn -v
 
 # 1. 去掉 -SNAPSHOT，定版（下面以 2.1.0 为例）
 #    注意：不要用 mvn versions:set —— 本机插件解析会挂住（P-04），用 sed 直接替换
-sed -i 's|<version>.*-SNAPSHOT</version>|<version>2.2.0</version>|g' pom.xml metapool-*/pom.xml
+sed -i 's|<version>.*-SNAPSHOT</version>|<version>2.3.0</version>|g' pom.xml metapool-*/pom.xml
 grep -rn SNAPSHOT pom.xml metapool-*/pom.xml    # 应无输出
 
 # 2. 先本地验一遍产物（跳过签名，避免 GPG 交互）：测试全绿 + source/javadoc jar 能出
@@ -83,7 +83,7 @@ git push origin v2.1.0
 # GitHub 建 Release，正文取 CHANGELOG.md 对应小节
 
 # 回到下一个开发周期（走 Actions 发布时 main 一直是 SNAPSHOT，这步只在本地发布后需要）
-sed -i 's|<version>2.2.0</version>|<version>2.2.0-SNAPSHOT</version>|g' pom.xml metapool-*/pom.xml
+sed -i 's|<version>2.3.0</version>|<version>2.2.0-SNAPSHOT</version>|g' pom.xml metapool-*/pom.xml
 git commit -am "chore: begin next dev cycle — 2.2.0-SNAPSHOT"
 ```
 
@@ -114,7 +114,7 @@ git commit -am "chore: begin next dev cycle — 2.2.0-SNAPSHOT"
     <dependency>
       <groupId>io.github.roseri66</groupId>
       <artifactId>metapool-bom</artifactId>
-      <version>2.2.0</version>
+      <version>2.3.0</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
