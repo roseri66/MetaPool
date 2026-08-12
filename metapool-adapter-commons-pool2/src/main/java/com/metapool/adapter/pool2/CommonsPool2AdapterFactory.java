@@ -3,6 +3,7 @@ package com.metapool.adapter.pool2;
 import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.resource.ResourceTypes;
+import com.metapool.common.spi.ConfigValues;
 import com.metapool.common.spi.ResourceAdapterFactory;
 import com.metapool.common.spi.ResourceDefinition;
 import org.apache.commons.pool2.PooledObjectFactory;
@@ -90,7 +91,7 @@ public final class CommonsPool2AdapterFactory implements ResourceAdapterFactory 
         Object maxWaitRaw = props.get(CommonsPool2Adapter.KEY_MAX_WAIT);
         builder.maxWait(maxWaitRaw == null
                 ? GenericObjectPoolConfig.DEFAULT_MAX_WAIT
-                : parseDuration(maxWaitRaw));
+                : ConfigValues.duration("max-wait", maxWaitRaw));
 
         return builder.build();
     }
@@ -147,36 +148,4 @@ public final class CommonsPool2AdapterFactory implements ResourceAdapterFactory 
         }
     }
 
-    /**
-     * 支持 {@code "3s"} / {@code "500ms"} / {@code "2m"} / 纯毫秒数字 / ISO-8601（{@code PT2S}）。
-     * <b>允许负数</b>——Pool2 约定负的 maxWait 表示无限等待。
-     *
-     * <p>这是本项目第三处相同的 duration 解析（另两处在 bucket4j / jdk-executor 的工厂里）。
-     * 按当初立的约定「第三个 adapter 再需要就抽取」，现在到点了 —— 但抽取目标
-     * {@code metapool-common} 是<b>已发布的公开契约层</b>，加公共 API 应当单独设计并让用户拍板，
-     * 不在适配器提交里顺手做。已记入待办。
-     */
-    static Duration parseDuration(Object raw) {
-        if (raw instanceof Number n) {
-            return Duration.ofMillis(n.longValue());
-        }
-        String s = String.valueOf(raw).trim();
-        try {
-            if (s.startsWith("PT") || s.startsWith("pt")) {
-                return Duration.parse(s);
-            }
-            if (s.endsWith("ms")) {
-                return Duration.ofMillis(Long.parseLong(s.substring(0, s.length() - 2).trim()));
-            }
-            if (s.endsWith("s")) {
-                return Duration.ofSeconds(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            if (s.endsWith("m")) {
-                return Duration.ofMinutes(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            return Duration.ofMillis(Long.parseLong(s));
-        } catch (RuntimeException e) {
-            throw new MetaPoolConfigException("invalid max-wait '" + s + "'", e);
-        }
-    }
 }

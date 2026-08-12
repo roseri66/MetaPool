@@ -28,6 +28,13 @@
 
 - **starter 支持 `metapool.redis.*` YAML 声明。**
 
+- **`ConfigValues.duration(key, raw)`**（`metapool-common` 的 `spi` 包）：适配器工厂共用的
+  duration 解析。此前在四个工厂里各有一份**完全相同**的实现，现收敛到一处 ——
+  它同时是 RULES §3.2 的一个落点（非法配置必须报 `MetaPoolConfigException`，
+  不能漏出裸的 `NumberFormatException`）。参数化 `key` 以保留各调用点原有的错误消息；
+  **刻意不校验正负**，因为负值在某些底层库里有确定含义（Commons Pool2 的负 `max-wait` = 无限等待），
+  解析器只管「能不能读懂」，不管「合不合理」。纯新增 API，无破坏性。
+
 ### 行为说明
 
 - **`health()` 的 DEGRADED 表示「正在自动重连」，不是故障。** Lettuce 默认自动重连，

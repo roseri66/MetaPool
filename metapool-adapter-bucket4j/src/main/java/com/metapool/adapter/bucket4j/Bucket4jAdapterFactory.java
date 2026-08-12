@@ -3,6 +3,7 @@ package com.metapool.adapter.bucket4j;
 import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.resource.ResourceTypes;
+import com.metapool.common.spi.ConfigValues;
 import com.metapool.common.spi.ResourceAdapterFactory;
 import com.metapool.common.spi.ResourceDefinition;
 
@@ -41,7 +42,7 @@ public final class Bucket4jAdapterFactory implements ResourceAdapterFactory {
                     "rate-limiter '" + definition.name() + "' requires 'limit-for-period'");
         }
         long limit = parseLimit(definition.name(), limitRaw);
-        Duration refill = parseDuration(props.getOrDefault("refill-period", "1s"));
+        Duration refill = ConfigValues.duration("refill-period", props.getOrDefault("refill-period", "1s"));
 
         Set<String> tunable = definition.tunableKeys().isEmpty()
                 ? Bucket4jAdapter.SUPPORTED_TUNABLE_KEYS
@@ -68,28 +69,4 @@ public final class Bucket4jAdapterFactory implements ResourceAdapterFactory {
         }
     }
 
-    /** 支持 {@code "1s"} / {@code "500ms"} / {@code "2m"} / 纯毫秒数字 / ISO-8601（{@code PT1S}）。 */
-    static Duration parseDuration(Object raw) {
-        if (raw instanceof Number n) {
-            return Duration.ofMillis(n.longValue());
-        }
-        String s = String.valueOf(raw).trim();
-        try {
-            if (s.startsWith("PT") || s.startsWith("pt")) {
-                return Duration.parse(s);
-            }
-            if (s.endsWith("ms")) {
-                return Duration.ofMillis(Long.parseLong(s.substring(0, s.length() - 2).trim()));
-            }
-            if (s.endsWith("s")) {
-                return Duration.ofSeconds(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            if (s.endsWith("m")) {
-                return Duration.ofMinutes(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            return Duration.ofMillis(Long.parseLong(s));
-        } catch (RuntimeException e) {
-            throw new MetaPoolConfigException("invalid refill-period '" + s + "'", e);
-        }
-    }
 }

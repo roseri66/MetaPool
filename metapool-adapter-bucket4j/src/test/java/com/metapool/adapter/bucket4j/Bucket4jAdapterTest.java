@@ -166,12 +166,4 @@ class Bucket4jAdapterTest {
         assertThrows(MetaPoolConfigException.class, () -> new Bucket4jAdapterFactory().create(def));
     }
 
-    @Test
-    void factory_parseDuration_variants() {
-        assertEquals(Duration.ofSeconds(1), Bucket4jAdapterFactory.parseDuration("1s"));
-        assertEquals(Duration.ofMillis(500), Bucket4jAdapterFactory.parseDuration("500ms"));
-        assertEquals(Duration.ofMinutes(2), Bucket4jAdapterFactory.parseDuration("2m"));
-        assertEquals(Duration.ofMillis(250), Bucket4jAdapterFactory.parseDuration(250));
-        assertEquals(Duration.ofSeconds(3), Bucket4jAdapterFactory.parseDuration("PT3S"));
-    }
 }

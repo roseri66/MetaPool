@@ -207,14 +207,6 @@ class LettuceAdapterTest {
         assertTrue(e.getMessage().contains("auto-reconnect"), e.getMessage());
     }
 
-    @Test
-    void factory_parseDuration_variants() {
-        assertEquals(Duration.ofSeconds(60), LettuceAdapterFactory.parseDuration("60s"));
-        assertEquals(Duration.ofMillis(500), LettuceAdapterFactory.parseDuration("500ms"));
-        assertEquals(Duration.ofMinutes(2), LettuceAdapterFactory.parseDuration("2m"));
-        assertEquals(Duration.ofMillis(250), LettuceAdapterFactory.parseDuration(250));
-        assertEquals(Duration.ofSeconds(3), LettuceAdapterFactory.parseDuration("PT3S"));
-    }
 
     @Test
     void factory_isDiscoverableViaServiceLoader() {

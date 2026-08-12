@@ -3,6 +3,7 @@ package com.metapool.adapter.executor;
 import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.resource.ResourceTypes;
+import com.metapool.common.spi.ConfigValues;
 import com.metapool.common.spi.ResourceAdapterFactory;
 import com.metapool.common.spi.ResourceDefinition;
 
@@ -56,7 +57,7 @@ public final class JdkExecutorAdapterFactory implements ResourceAdapterFactory {
         int max = maxRaw == null ? core : parseInt(name, JdkExecutorAdapter.KEY_MAXIMUM_POOL_SIZE, maxRaw);
         Object queueRaw = props.get("queue-capacity");
         int queueCapacity = queueRaw == null ? Integer.MAX_VALUE : parseInt(name, "queue-capacity", queueRaw);
-        Duration keepAlive = parseDuration(props.getOrDefault("keep-alive", "60s"));
+        Duration keepAlive = ConfigValues.duration("keep-alive", props.getOrDefault("keep-alive", "60s"));
         RejectionPolicy policy = RejectionPolicy.from(props.getOrDefault("rejection-policy", "abort"));
 
         Set<String> tunable = definition.tunableKeys().isEmpty()
@@ -86,34 +87,4 @@ public final class JdkExecutorAdapterFactory implements ResourceAdapterFactory {
         }
     }
 
-    /**
-     * 支持 {@code "60s"} / {@code "500ms"} / {@code "2m"} / 纯毫秒数字 / ISO-8601（{@code PT1M}）。
-     *
-     * <p>与 {@code Bucket4jAdapterFactory.parseDuration} 目前是重复实现。刻意不提前抽取到
-     * {@code metapool-common}：那是已发布的公开契约层，为两处重复就改它不划算。
-     * <b>第三个 adapter 再需要 duration 解析时就抽取</b>（届时重复三处，收益才盖过成本）。
-     */
-    static Duration parseDuration(Object raw) {
-        if (raw instanceof Number n) {
-            return Duration.ofMillis(n.longValue());
-        }
-        String s = String.valueOf(raw).trim();
-        try {
-            if (s.startsWith("PT") || s.startsWith("pt")) {
-                return Duration.parse(s);
-            }
-            if (s.endsWith("ms")) {
-                return Duration.ofMillis(Long.parseLong(s.substring(0, s.length() - 2).trim()));
-            }
-            if (s.endsWith("s")) {
-                return Duration.ofSeconds(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            if (s.endsWith("m")) {
-                return Duration.ofMinutes(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            return Duration.ofMillis(Long.parseLong(s));
-        } catch (RuntimeException e) {
-            throw new MetaPoolConfigException("invalid keep-alive '" + s + "'", e);
-        }
-    }
 }

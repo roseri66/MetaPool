@@ -6,6 +6,7 @@ import com.metapool.common.exception.MetaPoolException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.resource.ResourceTypes;
 import com.metapool.common.resource.Tunable;
+import com.metapool.common.spi.ConfigValues;
 import com.metapool.common.stats.HealthStatus;
 import com.metapool.common.stats.TuneResult;
 import io.lettuce.core.ClientOptions;
@@ -341,7 +342,7 @@ public final class LettuceAdapter implements ManagedResource, Tunable {
             }
             if (KEY_COMMAND_TIMEOUT.equals(key)) {
                 try {
-                    Duration v = LettuceAdapterFactory.parseDuration(e.getValue());
+                    Duration v = ConfigValues.duration(KEY_COMMAND_TIMEOUT, e.getValue());
                     if (v.isZero() || v.isNegative()) {
                         throw new IllegalArgumentException("must be positive, got " + v);
                     }

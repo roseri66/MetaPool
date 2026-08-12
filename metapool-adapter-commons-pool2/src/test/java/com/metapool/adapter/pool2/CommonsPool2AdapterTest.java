@@ -519,16 +519,6 @@ class CommonsPool2AdapterTest {
                 "类型不匹配应报错");
     }
 
-    @Test
-    void factory_parseDuration_variants_includingNegativeForUnlimited() {
-        assertEquals(Duration.ofSeconds(3), CommonsPool2AdapterFactory.parseDuration("3s"));
-        assertEquals(Duration.ofMillis(500), CommonsPool2AdapterFactory.parseDuration("500ms"));
-        assertEquals(Duration.ofMinutes(2), CommonsPool2AdapterFactory.parseDuration("2m"));
-        assertEquals(Duration.ofMillis(250), CommonsPool2AdapterFactory.parseDuration(250));
-        assertEquals(Duration.ofSeconds(2), CommonsPool2AdapterFactory.parseDuration("PT2S"));
-        assertEquals(Duration.ofMillis(-1), CommonsPool2AdapterFactory.parseDuration(-1),
-                "Pool2 约定：负的 max-wait 表示无限等待，不能被当成非法值拒掉");
-    }
 
     /** 编程式路径缺 factory 必须构建期就报，且消息要解释「为什么必须给」。 */
     @Test

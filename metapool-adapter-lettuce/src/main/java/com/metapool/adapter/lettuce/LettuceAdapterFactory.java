@@ -3,6 +3,7 @@ package com.metapool.adapter.lettuce;
 import com.metapool.common.exception.MetaPoolConfigException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.resource.ResourceTypes;
+import com.metapool.common.spi.ConfigValues;
 import com.metapool.common.spi.ResourceAdapterFactory;
 import com.metapool.common.spi.ResourceDefinition;
 
@@ -59,7 +60,7 @@ public final class LettuceAdapterFactory implements ResourceAdapterFactory {
                 .named(name)
                 .uri(String.valueOf(uriRaw).trim())
                 .commandTimeout(props.containsKey(LettuceAdapter.KEY_COMMAND_TIMEOUT)
-                        ? parseDuration(props.get(LettuceAdapter.KEY_COMMAND_TIMEOUT))
+                        ? ConfigValues.duration(LettuceAdapter.KEY_COMMAND_TIMEOUT, props.get(LettuceAdapter.KEY_COMMAND_TIMEOUT))
                         : Duration.ofSeconds(60))
                 .autoReconnect(parseBoolean(name, props.get("auto-reconnect")))
                 .tunable(tunable)
@@ -86,35 +87,4 @@ public final class LettuceAdapterFactory implements ResourceAdapterFactory {
                 + "' has invalid 'auto-reconnect': " + raw + " (expected true/false)");
     }
 
-    /**
-     * 支持 {@code "60s"} / {@code "500ms"} / {@code "2m"} / 纯毫秒数字 / ISO-8601（{@code PT1M}）。
-     *
-     * <p>这是本项目第四处相同的 duration 解析（另三处在 bucket4j / jdk-executor / commons-pool2
-     * 的工厂里）。当初立的约定是「第三个 adapter 再需要就抽取」，现在已经第四处了 ——
-     * <b>抽取到 {@code metapool-common} 已经该做，但那是已发布公开契约层加 API，
-     * 应单独设计并让用户拍板，不在适配器提交里顺手做。已记入待办。</b>
-     */
-    static Duration parseDuration(Object raw) {
-        if (raw instanceof Number n) {
-            return Duration.ofMillis(n.longValue());
-        }
-        String s = String.valueOf(raw).trim();
-        try {
-            if (s.startsWith("PT") || s.startsWith("pt")) {
-                return Duration.parse(s);
-            }
-            if (s.endsWith("ms")) {
-                return Duration.ofMillis(Long.parseLong(s.substring(0, s.length() - 2).trim()));
-            }
-            if (s.endsWith("s")) {
-                return Duration.ofSeconds(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            if (s.endsWith("m")) {
-                return Duration.ofMinutes(Long.parseLong(s.substring(0, s.length() - 1).trim()));
-            }
-            return Duration.ofMillis(Long.parseLong(s));
-        } catch (RuntimeException e) {
-            throw new MetaPoolConfigException("invalid command-timeout '" + s + "'", e);
-        }
-    }
 }

@@ -176,10 +176,19 @@ PING 抛异常                            → DOWN
 
 ---
 
-## 十、遗留
+## 十、✅ 顺带还掉的一笔技术债：`parseDuration` 已抽取
 
-`parseDuration` 已经是**第四处**相同实现（bucket4j / jdk-executor / commons-pool2 / lettuce）。
-当初立的约定是"第三个 adapter 再需要就抽取"，现在已经超了。
+写这个适配器时，`parseDuration` 成了**第四处**完全相同的实现
+（bucket4j / jdk-executor / commons-pool2 / lettuce）。当初立的约定是「第三个 adapter
+再需要就抽取」—— 已经超了一处。
 
-**该抽到 `metapool-common` 了**，但那是已发布的公开契约层加 API，应当单独设计并让用户拍板，
-不在适配器提交里顺手做。已记入待办。
+已抽到 `metapool-common` 的 `com.metapool.common.spi.ConfigValues.duration(key, raw)`：
+
+- **参数化 `key`** 是为了保留各调用点原有的错误消息（`invalid keep-alive '...'` /
+  `invalid max-wait '...'`）——抽取不该让报错变得更含糊。
+- **刻意不校验正负**：负值在 Commons Pool2 里有确定含义（负的 `max-wait` = 无限等待）。
+  **解析器只管「能不能读懂」，不管「合不合理」** —— 是否允许负数属于各适配器自己的语义。
+- 四份重复的测试也一并删掉，共用逻辑只在 `ConfigValuesTest` 一处保证正确性。
+
+> 为什么之前一直没抽：它是**已发布公开契约层**加 API，属于要单独拍板的事，
+> 不该在适配器提交里顺手做。等到攒够四处、边际收益明显盖过成本时再做，是刻意的。

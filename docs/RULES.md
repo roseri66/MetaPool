@@ -50,8 +50,8 @@
 
 1. 每个新能力至少一条测试；**修一个 bug 必须补一条会失败的回归测试**。
 2. 合入前 `mvn clean test` 必须全绿。当前基线（2026-08-13 实测 `mvn -B clean verify` 汇总）：
-   - **有 Docker：167 通过 + 0 跳过**
-   - **无 Docker：152 通过 + 15 跳过**
+   - **有 Docker：168 通过 + 0 跳过**
+   - **无 Docker：153 通过 + 15 跳过**
 
    那 15 条是需要真后端的集成测试：`HikariAdapterPostgresTest`（1，PG）、
    `RedissonLockAdapterRedisTest`（7，Redis）、`LettuceAdapterRedisTest`（7，Redis）。

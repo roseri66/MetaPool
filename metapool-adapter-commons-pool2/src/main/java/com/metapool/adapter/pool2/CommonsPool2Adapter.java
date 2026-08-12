@@ -8,6 +8,7 @@ import com.metapool.common.exception.PoolExhaustedException;
 import com.metapool.common.resource.ManagedResource;
 import com.metapool.common.resource.ResourceTypes;
 import com.metapool.common.resource.Tunable;
+import com.metapool.common.spi.ConfigValues;
 import com.metapool.common.stats.HealthStatus;
 import com.metapool.common.stats.PoolStats;
 import com.metapool.common.stats.TuneResult;
@@ -433,7 +434,7 @@ public final class CommonsPool2Adapter<T> implements ManagedResource, Pool<T>, T
                         this.minIdle = v;
                     }
                     case KEY_MAX_WAIT -> {
-                        Duration v = CommonsPool2AdapterFactory.parseDuration(entry.getValue());
+                        Duration v = ConfigValues.duration(KEY_MAX_WAIT, entry.getValue());
                         p.setMaxWait(v);
                         this.maxWait = v;
                     }

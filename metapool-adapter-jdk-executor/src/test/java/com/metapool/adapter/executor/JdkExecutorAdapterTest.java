@@ -515,14 +515,6 @@ class JdkExecutorAdapterTest {
                 "core=0 且未给 max 时，max 跟随 core 为 0，应报「至少为 1」");
     }
 
-    @Test
-    void factory_parseDuration_variants() {
-        assertEquals(Duration.ofSeconds(60), JdkExecutorAdapterFactory.parseDuration("60s"));
-        assertEquals(Duration.ofMillis(500), JdkExecutorAdapterFactory.parseDuration("500ms"));
-        assertEquals(Duration.ofMinutes(2), JdkExecutorAdapterFactory.parseDuration("2m"));
-        assertEquals(Duration.ofMillis(250), JdkExecutorAdapterFactory.parseDuration(250));
-        assertEquals(Duration.ofSeconds(3), JdkExecutorAdapterFactory.parseDuration("PT3S"));
-    }
 
     @Test
     void rejectionPolicy_parsing_isCaseAndSeparatorInsensitive() {
