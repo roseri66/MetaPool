@@ -76,13 +76,13 @@
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-spring-starter</artifactId>
-    <version>2.3.0</version>
+    <version>2.4.0</version>
 </dependency>
 <!-- 按需引入所用资源类型的 adapter（SPI 自动发现） -->
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-adapter-hikari</artifactId>
-    <version>2.3.0</version>
+    <version>2.4.0</version>
 </dependency>
 <!-- 想在 /actuator/prometheus 看到下面那些 metapool_* 指标，还需要这个（Spring Boot 的常规要求，
      不是 MetaPool 特有）。只用 /actuator/metapool 查看与调参的话可以不引。 -->
@@ -280,7 +280,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 2.1 P0 | GitHub Actions CI + `DistributedLock` / `ManagedExecutor` 能力接口 | ✅ |
 | 2.1–2.4 | 适配器谱系**已完整**：`datasource` / `rate-limiter` / `executor` / `lock` / `object` / `redis` / `memory` | ✅ |
-| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.3.0`，10 个构件（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
+| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.4.0`，11 个构件（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 | CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 
 ## 这个项目是什么 / 不是什么

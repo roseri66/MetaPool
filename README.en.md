@@ -92,13 +92,13 @@ parameters, so it simply does not claim the capability.
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-spring-starter</artifactId>
-    <version>2.3.0</version>
+    <version>2.4.0</version>
 </dependency>
 <!-- Add an adapter for each resource type you use (discovered via SPI) -->
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-adapter-hikari</artifactId>
-    <version>2.3.0</version>
+    <version>2.4.0</version>
 </dependency>
 <!-- Needed for the metapool_* metrics below to show up on /actuator/prometheus.
      This is a standard Spring Boot requirement, not something MetaPool adds.
@@ -304,7 +304,7 @@ unavailable it skips itself rather than failing the build.
 | M2 | HikariCP adapter | ✅ |
 | M3 | Bucket4j adapter + control plane + starter | ✅ |
 | M4 | Docs / examples / JMH benchmark / Testcontainers | ✅ |
-| Release | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ `2.3.0` on Maven Central, 10 artifacts |
+| Release | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ `2.4.0` on Maven Central, 11 artifacts |
 | CI | GitHub Actions: ubuntu + windows × JDK 17, plus a manual release workflow | ✅ |
 | 2.1 P0 | `DistributedLock` / `ManagedExecutor` capability interfaces | ✅ |
 | 2.1–2.4 | Adapter lineage **complete**: `datasource`, `rate-limiter`, `executor`, `lock`, `object`, `redis`, `memory` | ✅ |
