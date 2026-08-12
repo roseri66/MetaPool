@@ -444,6 +444,189 @@
           "legendFormat": "{{metapool_resource}} · rejected"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Distributed lock (分布式锁)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Locks held (this process)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_lock_held{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · held"
+        }
+      ],
+      "description": "本进程当前持有的锁数量。\n\n注意这是**进程内**视角 —— 分布式锁的全局持有情况要问 Redis，不是进程内控制面能回答的（ResourceManager 是进程内对象，RULES §2.7）。\n\n该值长期不归零 = 有凭证没被 close()。"
+    },
+    {
+      "type": "timeseries",
+      "title": "Acquire vs Timeout (per second)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*timeout.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_lock_acquired_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · acquired"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (metapool_resource) (rate(metapool_lock_timeout_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · timeout"
+        }
+      ],
+      "description": "timeout = 在 waitTime 内没拿到锁。\n\n持续偏高说明锁竞争激烈：要么临界区太长，要么锁粒度太粗。"
+    },
+    {
+      "type": "timeseries",
+      "title": "Lease expiry (per second)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_lock_lease_expired_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · lease expired"
+        }
+      ],
+      "description": "🔴 **正常情况下应恒为 0。**\n\n不为 0 意味着业务执行超过了租约：锁已自动释放、另一个进程可能已拿到同一把锁，而 MetaPool 的 DistributedLock 不提供 fencing token，下游无法拒绝过期持有者的迟到写入。\n\n处置：调大 leaseTime（建议为业务耗时的 3~5 倍）或缩短临界区。完整论证见 docs/design/adapter-redisson.md。\n\n口径说明：这是**近似值** —— 真正的到期发生在 Redis 侧，进程内只能在 close() 时发现「锁已不归我们」。"
     }
   ]
 }
