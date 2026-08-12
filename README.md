@@ -195,6 +195,18 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 
 规划中的适配器：Lettuce（redis）、Netty（memory）。
 
+**第三方类型也能用 YAML 声明**（2.1 起）：
+
+```yaml
+metapool:
+  resources:
+    my-custom-type:        # 你自己的 adapter 的 type()，SPI 发现即可用
+      whatever:
+        some-native-key: 42
+```
+
+内置类型的具名分段（`datasources` / `rate-limiters` / …）一个都没废弃，两种写法可混用。
+
 **能力接口是可选的，也可核验**：`metapool-adapter-redisson` **不实现 `Tunable`** —— Redisson 锁的
 `waitTime` / `leaseTime` 是每次调用传入的，没有运行时可调参数，于是就不实现。谁有谁实现，
 不为「显得完整」硬凑。这与 1.0 「定义大接口 → 逼所有资源实现 → 实现不了就抛

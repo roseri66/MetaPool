@@ -85,12 +85,28 @@
   修复后 8 条集成测试（PG 1 条 + Redis 7 条）在本机真跑通过，基线 84+8跳过 → **92 全通过**。
   仅影响测试执行，不改变任何发布物。
 
-### 已知局限
+### 配置
 
-- 配置绑定为每个内置类型硬编码一个 Map 字段（`datasources` / `rate-limiters` / `executors`），
-  因此**第三方经 SPI 扩展的资源类型暂时无法用 YAML 声明**，只能编程式接入。
-  `type()` 用 String 而非 enum 的本意恰恰是不挡第三方扩展，配置层把这个口子堵回去了一半。
-  通用化方案（`metapool.resources.<type>.<name>`）属公开配置面变更，待专门设计。
+- **新增通用分段 `metapool.resources.<类型>.<名称>`，类型任意。**
+  此前配置绑定为每个内置类型硬编码一个 Map 字段（`datasources` / `rate-limiters` / …），
+  于是**第三方经 SPI 扩展的资源类型根本没法用 YAML 声明**——而 `type()` 用 String 而非 enum
+  的本意恰恰是不挡第三方扩展，配置层把这个口子堵掉了一半。现在补上了：
+
+  ```yaml
+  metapool:
+    resources:
+      datasource:            # 内置类型也能这么写
+        reporting:
+          jdbc-url: jdbc:postgresql://.../report
+      my-custom-type:        # 第三方 adapter 的类型，SPI 发现即可用
+        whatever:
+          some-native-key: 42
+  ```
+
+  **具名分段一个都没废弃**，2.0.x 的配置无需任何改动即可升级；两种写法可自由混用。
+  唯一约束是资源名全局唯一——同名在两处出现会**启动即失败，并指出是哪两段撞了**
+  （控制面自带的重名拒绝只能说「名字撞了」，说不出出处，而混用时这正是最容易犯的错）。
+  未知类型同样启动即失败，并列出实际可用的类型。
 
 ---
 

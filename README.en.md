@@ -217,6 +217,18 @@ classpath means one more supported resource type, with **zero changes to the cor
 That claim is verifiable rather than aspirational: adding `metapool-adapter-jdk-executor` touched
 **neither `metapool-core` nor `metapool-common`** (see `git show 8685ee3 --stat`).
 
+Third-party types are declarable from YAML too (since 2.1):
+
+```yaml
+metapool:
+  resources:
+    my-custom-type:        # your adapter's type(), discovered via SPI
+      whatever:
+        some-native-key: 42
+```
+
+The per-type sections (`datasources`, `rate-limiters`, …) are all still supported; the two forms mix freely.
+
 Capability interfaces are genuinely optional, and that is verifiable too: `metapool-adapter-redisson`
 **does not implement `Tunable`** — a Redisson lock takes `waitTime` / `leaseTime` per call, so it has
 no runtime-tunable parameters, so it simply does not claim the capability. Implement what you have;
