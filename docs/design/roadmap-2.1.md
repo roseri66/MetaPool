@@ -66,7 +66,7 @@
 | `adapter-lettuce`（redis） | Lettuce | `Pool<StatefulConnection>` | Lettuce 单连接多路复用，"池"语义需想清楚是否真需要池化；也可只做治理不做 Pool |
 | `adapter-commons-pool2`（object） | Commons Pool2 | `Pool<T>` | 最直接对称 hikari，低风险，适合先做 |
 | ~~`adapter-jdk-executor`（executor）~~ | JDK ThreadPoolExecutor | `ManagedExecutor` | ✅ **已完成 2026-08-12** |
-| `adapter-redisson`（lock） | Redisson | `DistributedLock`（见 P0#2） | 依赖 Redis，测试用 Testcontainers Redis；看门狗续期语义 |
+| ~~`adapter-redisson`（lock）~~ | Redisson | `DistributedLock` | ✅ **已完成 2026-08-12**，取舍见 [`adapter-redisson.md`](adapter-redisson.md) |
 | `adapter-netty`（memory） | Netty `PooledByteBufAllocator` | `Pool<ByteBuf>` 或自定义 | 堆外内存，度量口径与释放安全性需谨慎 |
 
 **原建议顺序**：commons-pool2（最对称、最低风险）→ jdk-executor → redisson → lettuce → netty。
@@ -88,6 +88,17 @@
   3. 底层运行时改不了的参数（如队列容量）**不进 `Tunable` 白名单** —— 放进去等于承诺一件
      底层做不到的事，是 P-07 的思路错误换到调参这一面。
 - 新增台账 P-19 / P-20 / P-21。
+
+### ✅ `adapter-redisson` 完成记录（2026-08-12）
+
+- **结论：`DistributedLock` 抽对了** —— 核心零改动，21 条测试（14 本地 + 7 需 Docker）。
+  2.1 定义的两个新能力接口至此**都有了真实现**，没有一个被迫抛 `UnsupportedOperationException`。
+- **核心取舍**：契约要求 `leaseTime` 必填 ⇒ Redisson **看门狗永远不启用** ⇒
+  业务超时会被抢锁，且无 fencing token 兜底。选它是因为**失败可观测、可调、可预期**，
+  而看门狗方案的失败（进程崩溃后锁悬挂）是静默的。代价已写进类注释 + 专门的测试 + 独立指标。
+- **它不实现 `Tunable`** —— 没有运行时可调参数就不实现，可选能力接口正常工作的证据。
+- 完整论证见 [`adapter-redisson.md`](adapter-redisson.md)（**面试素材**：为什么先做它、
+  牺牲了什么、怎么让代价可见）。
 
 **每落一个 adapter 同步做**：examples 里纳管它、Grafana 看板加对应面板、README 模块表更新（两版）。
 

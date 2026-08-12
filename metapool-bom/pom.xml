@@ -45,6 +45,11 @@
             </dependency>
             <dependency>
                 <groupId>io.github.roseri66</groupId>
+                <artifactId>metapool-adapter-redisson</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.roseri66</groupId>
                 <artifactId>metapool-spring-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>

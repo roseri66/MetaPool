@@ -183,6 +183,7 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 | `metapool-adapter-hikari` | 把 HikariCP 纳入治理（`datasource`） |
 | `metapool-adapter-bucket4j` | 把 Bucket4j 纳入治理（`rate-limiter`，非池资源） |
 | `metapool-adapter-jdk-executor` | 把 JDK `ThreadPoolExecutor` 纳入治理（`executor`，非池资源） |
+| `metapool-adapter-redisson` | 把 Redisson 分布式锁纳入治理（`lock`，非池资源，**不实现 `Tunable`**） |
 | `metapool-spring-starter` | Spring Boot 自动装配 + Actuator health/tune 端点 |
 
 ## 扩展新资源类型
@@ -191,7 +192,12 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 
 **这不是宣传语，是可核验的事实**：加入 `metapool-adapter-jdk-executor` 时，`metapool-core` 与 `metapool-common` **零改动**（`git show 8685ee3 --stat` 可查）。
 
-规划中的适配器：Commons-Pool2（object）、Redisson（lock）、Lettuce（redis）、Netty（memory）。
+规划中的适配器：Commons-Pool2（object）、Lettuce（redis）、Netty（memory）。
+
+**能力接口是可选的，也可核验**：`metapool-adapter-redisson` **不实现 `Tunable`** —— Redisson 锁的
+`waitTime` / `leaseTime` 是每次调用传入的，没有运行时可调参数，于是就不实现。谁有谁实现，
+不为「显得完整」硬凑。这与 1.0 「定义大接口 → 逼所有资源实现 → 实现不了就抛
+`UnsupportedOperationException`」恰好相反。
 
 ---
 
@@ -211,7 +217,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 2.1 P0 | GitHub Actions CI + `DistributedLock` / `ManagedExecutor` 能力接口 | ✅ |
-| 2.1 P1 | `executor` 适配器（JDK 线程池）已落地；object / lock / redis / memory 待做（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 🚧 |
+| 2.1 P1 | `executor`（JDK 线程池）+ `lock`（Redisson）适配器已落地；object / redis / memory 待做（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 🚧 |
 | 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.0.1`（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 | CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 

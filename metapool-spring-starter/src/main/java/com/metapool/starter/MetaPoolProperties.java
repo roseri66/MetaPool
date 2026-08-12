@@ -30,7 +30,14 @@ import java.util.Map;
  *       maximum-pool-size: 8
  *       queue-capacity: 100
  *       tunable: [core-pool-size, maximum-pool-size]
+ *   locks:
+ *     order-lock:
+ *       address: redis://127.0.0.1:6379
+ *       key-prefix: "myapp:lock:"
  * }</pre>
+ *
+ * <p>注意 {@code locks} 没有 {@code tunable}：Redisson 锁的 {@code waitTime} / {@code leaseTime}
+ * 是每次调用传入的，不是配置项，故该适配器不实现 {@code Tunable}。
  *
  * <h3>已知局限：每种资源类型一个字段</h3>
  * <p>本类为每个内置类型硬编码了一个 Map 字段。这意味着<b>第三方经 SPI 扩展的资源类型无法用
@@ -54,6 +61,9 @@ public class MetaPoolProperties {
 
     /** 线程池（type=executor），名称 → 直通 JDK ThreadPoolExecutor 的属性。 */
     private Map<String, Map<String, Object>> executors = new LinkedHashMap<>();
+
+    /** 分布式锁（type=lock），名称 → 直通 Redisson 的属性。 */
+    private Map<String, Map<String, Object>> locks = new LinkedHashMap<>();
 
     public boolean isEnabled() {
         return enabled;
@@ -85,5 +95,13 @@ public class MetaPoolProperties {
 
     public void setExecutors(Map<String, Map<String, Object>> executors) {
         this.executors = executors;
+    }
+
+    public Map<String, Map<String, Object>> getLocks() {
+        return locks;
+    }
+
+    public void setLocks(Map<String, Map<String, Object>> locks) {
+        this.locks = locks;
     }
 }

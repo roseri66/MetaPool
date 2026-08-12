@@ -23,6 +23,16 @@ metapool:
       rejection-policy: abort      # 饱和时透传 JDK 的 RejectedExecutionException，不包装
       tunable: [core-pool-size, maximum-pool-size]
 
+  # 分布式锁（metapool-adapter-redisson）默认不开：本 demo 的定位是「开箱即跑」，
+  # 而 Redis 是外部服务，不像 H2 那样能内嵌。取消注释前请先起一个 Redis：
+  #     docker run -d -p 6379:6379 redis:7-alpine
+  # 起不来时会 fail-fast（启动即报错），这是 §3.3 刻意的行为，不是 bug。
+  # locks:
+  #   order-lock:
+  #     address: redis://127.0.0.1:6379
+  #     key-prefix: "demo:lock:"
+  #     # 无 tunable：waitTime / leaseTime 是每次调用传入的，不是配置项
+
 # 注意：为了 demo 开箱即跑，这里把 metapool 端点直接暴露且未加认证。
 # metapool 端点含 @WriteOperation（热调参），生产环境务必用 Spring Security 保护
 # 或绑到内网管理端口（management.server.port / address）—— 不要照搬本文件。

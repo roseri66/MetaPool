@@ -25,8 +25,15 @@
   热调 `core-pool-size` / `maximum-pool-size`。
   **加入它时 `metapool-core` 与 `metapool-common` 零改动** —— SPI 扩展点的可核验证据。
 
-- **starter 支持 `metapool.executors.*` YAML 声明**，示例应用同时纳管
-  datasource + rate-limiter + executor 三类资源。
+- **`metapool-adapter-redisson`**：把 Redisson 分布式锁纳入治理（类型 `lock`）。
+  `DistributedLock` 的第一个实现。同样是**核心零改动**。
+  设计取舍全文见 [`docs/design/adapter-redisson.md`](docs/design/adapter-redisson.md)。
+  **它刻意不实现 `Tunable`** —— Redisson 锁的 `waitTime` / `leaseTime` 是每次调用传入的，
+  没有运行时可调参数。可选能力谁有谁实现，不为「显得完整」硬凑（有测试守着）。
+
+- **starter 支持 `metapool.executors.*` / `metapool.locks.*` YAML 声明**，
+  示例应用默认纳管 datasource + rate-limiter + executor 三类；
+  锁需要外部 Redis，故在 `application.yml` 中以注释形式给出完整配置（demo 保持开箱即跑）。
 
 ### 行为说明（新资源类型自带的边界）
 
@@ -39,13 +46,32 @@
   要让 max 生效必须配有界队列。
 - **`queue-capacity` 不可热调**：JDK 队列容量构造时确定，放进白名单等于承诺一件底层做不到的事。
 
+- 🔴 **分布式锁：必填 `leaseTime` 会关掉 Redisson 的看门狗**，即锁**不会自动续期**。
+  这是 `DistributedLock` 契约「`leaseTime` 必填」的直接后果，**不是 bug**。
+  代价是：业务执行超过租约时锁会被释放、另一进程可拿到同一把锁，
+  而本契约又不提供 fencing token，下游无法拒绝过期持有者的迟到写入。
+  **换来的是**：持有者进程崩溃时锁一定会过期（不会永久死锁），且失败是**可观测的**——
+  `metapool.lock.lease.expired.total` 持续上涨即提示 `leaseTime` 配短了。
+  规避建议（租约设为业务耗时 3~5 倍、临界区不做无界 IO、强正确性场景改用存储层互斥）
+  与完整论证见适配器类注释与设计文档。该行为有专门的测试演示，以防被无意改掉。
+
 ### 文档
 
 - 踩坑台账新增 P-19（两个 size setter 各自校验 `core<=max`，逐个应用会炸在中间态）、
   P-20（`SynchronousQueue.remainingCapacity()` 恒为 0，只看队列会误判健康）、
-  P-21（有状态资源在缓存复用的 Spring 上下文里造成顺序依赖的假失败）。
+  P-21（有状态资源在缓存复用的 Spring 上下文里造成顺序依赖的假失败）、
+  P-22（Testcontainers 默认的 Docker API 版本被新引擎拒绝，集成测试被**静默跳过**而构建仍是绿的）。
 - 修正 RULES 两处与实际不符：commit 尾注规则（2026-07-29 已全历史清除 AI 尾注）、
   P-03 的 maven-enforcer 根治项（早已落地，此前仍标「待办」）。
+
+### 构建
+
+- **修复：Testcontainers 集成测试在新版 Docker 上被静默跳过。** Testcontainers 内置的 docker-java
+  默认按 Docker API `1.32` 发请求，而 Docker Engine 29.x 的最低 API 版本是 `1.40`，`/info` 直接
+  返回 400；Testcontainers 把它理解成「本机没有 Docker」而跳过全部集成测试，**构建依然 BUILD SUCCESS**。
+  父 pom 的 surefire 现显式传 `api.version`（取 `1.40`——新引擎的下限，同时在老引擎支持范围内，两头兼容）。
+  修复后 8 条集成测试（PG 1 条 + Redis 7 条）在本机真跑通过，基线 84+8跳过 → **92 全通过**。
+  仅影响测试执行，不改变任何发布物。
 
 ### 已知局限
 

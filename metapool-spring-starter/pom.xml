@@ -43,6 +43,12 @@
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.github.roseri66</groupId>
+            <artifactId>metapool-adapter-redisson</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
 
         <!-- Spring Boot -->
         <dependency>

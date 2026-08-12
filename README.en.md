@@ -205,6 +205,7 @@ is in [`docs/design/metapool-2.0.md`](docs/design/metapool-2.0.md) (Chinese).
 | `metapool-adapter-hikari` | Brings HikariCP under governance (`datasource`) |
 | `metapool-adapter-bucket4j` | Brings Bucket4j under governance (`rate-limiter` — a non-pool resource) |
 | `metapool-adapter-jdk-executor` | Brings the JDK `ThreadPoolExecutor` under governance (`executor` — a non-pool resource) |
+| `metapool-adapter-redisson` | Brings Redisson distributed locks under governance (`lock` — a non-pool resource; **does not implement `Tunable`**) |
 | `metapool-spring-starter` | Spring Boot auto-configuration + Actuator health/tune endpoints |
 
 ## Supporting a new resource type
@@ -215,7 +216,14 @@ classpath means one more supported resource type, with **zero changes to the cor
 That claim is verifiable rather than aspirational: adding `metapool-adapter-jdk-executor` touched
 **neither `metapool-core` nor `metapool-common`** (see `git show 8685ee3 --stat`).
 
-Planned adapters: Commons-Pool2 (object), Redisson (lock), Lettuce (redis), Netty (memory).
+Capability interfaces are genuinely optional, and that is verifiable too: `metapool-adapter-redisson`
+**does not implement `Tunable`** — a Redisson lock takes `waitTime` / `leaseTime` per call, so it has
+no runtime-tunable parameters, so it simply does not claim the capability. Implement what you have;
+never pad the surface to look complete. That is the exact inverse of 1.0, which defined one large
+interface, forced every resource to implement it, and threw `UnsupportedOperationException` where
+the semantics did not fit.
+
+Planned adapters: Commons-Pool2 (object), Lettuce (redis), Netty (memory).
 
 ---
 
@@ -259,7 +267,7 @@ unavailable it skips itself rather than failing the build.
 | Release | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ `2.0.1` on Maven Central |
 | CI | GitHub Actions: ubuntu + windows × JDK 17, plus a manual release workflow | ✅ |
 | 2.1 P0 | `DistributedLock` / `ManagedExecutor` capability interfaces | ✅ |
-| 2.1 P1 | `executor` adapter (JDK thread pool) landed; object / lock / redis / memory to go — see the [2.1 roadmap](docs/design/roadmap-2.1.md) | 🚧 |
+| 2.1 P1 | `executor` (JDK thread pool) and `lock` (Redisson) adapters landed; object / redis / memory to go — see the [2.1 roadmap](docs/design/roadmap-2.1.md) | 🚧 |
 
 ## What this project is, and is not
 
