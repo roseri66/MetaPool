@@ -31,22 +31,29 @@ class MetaPoolAutoConfigurationTest {
                     "metapool.executors.order-worker.core-pool-size=2",
                     "metapool.executors.order-worker.maximum-pool-size=4",
                     "metapool.executors.order-worker.queue-capacity=50",
-                    "metapool.executors.order-worker.tunable=core-pool-size,maximum-pool-size");
+                    "metapool.executors.order-worker.tunable=core-pool-size,maximum-pool-size",
+                    "metapool.objects.buffer-pool.factory-class="
+                            + "com.metapool.starter.TestPooledObjectFactory",
+                    "metapool.objects.buffer-pool.max-total=4",
+                    "metapool.objects.buffer-pool.max-wait=500ms",
+                    "metapool.objects.buffer-pool.tunable=max-total");
 
     @Test
-    void autoConfigures_registersAllThreeResources_andBindsUnifiedMetrics() {
+    void autoConfigures_registersAllFourResources_andBindsUnifiedMetrics() {
         runner.run(ctx -> {
             assertThat(ctx).hasSingleBean(ResourceManager.class);
             ResourceManager mgr = ctx.getBean(ResourceManager.class);
 
-            assertThat(mgr.resources()).hasSize(3);
+            assertThat(mgr.resources()).hasSize(4);
             assertThat(mgr.find("main")).isPresent();
             assertThat(mgr.find("order-api")).isPresent();
             assertThat(mgr.find("order-worker")).isPresent();
+            assertThat(mgr.find("buffer-pool")).isPresent();
             assertThat(mgr.health().status()).isEqualTo(HealthStatus.Status.UP);
 
-            // 头牌证据：一个 MeterRegistry 同时持有连接池 + 限流器 + 线程池的统一 tag 指标。
-            // 三类底层库毫不相干（HikariCP / Bucket4j / JDK），指标却能在同一块看板上并列。
+            // 头牌证据：一个 MeterRegistry 同时持有连接池 + 限流器 + 线程池 + 对象池的统一 tag 指标。
+            // 四类底层库毫不相干（HikariCP / Bucket4j / JDK / Commons Pool2），
+            // 指标却能在同一块看板上并列。
             MeterRegistry registry = ctx.getBean(MeterRegistry.class);
             assertThat(registry.find("metapool.datasource.connections.active")
                     .tag("metapool.resource", "main").gauge()).isNotNull();
@@ -55,11 +62,33 @@ class MetaPoolAutoConfigurationTest {
             assertThat(registry.find("metapool.executor.active")
                     .tag("metapool.resource", "order-worker")
                     .tag("metapool.type", "executor").gauge()).isNotNull();
+            assertThat(registry.find("metapool.object.active")
+                    .tag("metapool.resource", "buffer-pool")
+                    .tag("metapool.type", "object").gauge()).isNotNull();
 
-            // 统一动态调参：同一个 tune 入口，路由到两种毫不相干的底层库
+            // 统一动态调参：同一个 tune 入口，路由到三种毫不相干的底层库
             assertThat(mgr.tune("main", java.util.Map.of("maximum-pool-size", "8")).success()).isTrue();
             assertThat(mgr.tune("order-worker",
                     java.util.Map.of("core-pool-size", "3", "maximum-pool-size", "6")).success()).isTrue();
+            assertThat(mgr.tune("buffer-pool", java.util.Map.of("max-total", "8")).success()).isTrue();
+        });
+    }
+
+    /**
+     * 对象池的 {@code factory-class} 反射路径要能穿过自动装配真的跑通 ——
+     * Commons Pool2 不知道怎么造 T，工厂对象又写不进 YAML，这条路径是它能声明式接入的唯一办法。
+     */
+    @Test
+    void objectPool_factoryClassIsInstantiated_andPoolWorks() {
+        runner.run(ctx -> {
+            ResourceManager mgr = ctx.getBean(ResourceManager.class);
+            @SuppressWarnings("unchecked")
+            var pool = (com.metapool.common.capability.Pool<Object>) mgr.get("buffer-pool");
+            Object obj = pool.borrow();
+            assertThat(obj).asString().startsWith("pooled-");
+            pool.release(obj);
+            assertThat(pool.poolStats().totalBorrowed()).isEqualTo(1);
+            assertThat(pool.poolStats().totalReleased()).isEqualTo(1);
         });
     }
 

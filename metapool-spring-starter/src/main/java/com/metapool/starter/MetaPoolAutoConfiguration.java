@@ -57,6 +57,8 @@ public class MetaPoolAutoConfiguration {
                 manager.register(loader.create(toDefinition(name, ResourceTypes.EXECUTOR, raw))));
         props.getLocks().forEach((name, raw) ->
                 manager.register(loader.create(toDefinition(name, ResourceTypes.LOCK, raw))));
+        props.getObjects().forEach((name, raw) ->
+                manager.register(loader.create(toDefinition(name, ResourceTypes.OBJECT, raw))));
 
         meterRegistries.ifAvailable(manager::bindMetrics);
         manager.start();

@@ -31,7 +31,19 @@
   **它刻意不实现 `Tunable`** —— Redisson 锁的 `waitTime` / `leaseTime` 是每次调用传入的，
   没有运行时可调参数。可选能力谁有谁实现，不为「显得完整」硬凑（有测试守着）。
 
-- **starter 支持 `metapool.executors.*` / `metapool.locks.*` YAML 声明**，
+- **`metapool-adapter-commons-pool2`**：把 Commons Pool2 通用对象池纳入治理（类型 `object`）。
+  核心零改动。这是继 HikariCP 之后第二个**真·池**（实现 `Pool<T>`）。
+  两点与 Hikari 不同，都写进了 javadoc：
+  - **它没有「自带工厂」** —— Commons Pool2 不知道怎么造 `T`，必须由使用方提供
+    `PooledObjectFactory`。因此编程式接入为首选；YAML 走 `factory-class`（要求无参构造，
+    构造期 fail-fast 校验类存在 / 确实实现该接口 / 有无参构造）。保留这条路是为了不破坏
+    SPI 对称性 —— 否则 `create()` 只能抛异常，这个适配器就成了二等公民。
+  - 🎯 **`borrow(Duration)` 在这里是真超时**：Commons Pool2 原生支持 `borrowObject(Duration)`，
+    确实按传入值限时；而 `HikariAdapter` 只能以配置项 `connectionTimeout` 为界、参数仅作提示。
+    同一接口方法两种语义强度，两边 javadoc 均已写明。这也顺带兑现了 2.1 路线图 P2 里
+    「`Pool.borrow(Duration)` 真超时」那条待办（在本适配器上天然成立）。
+
+- **starter 支持 `metapool.executors.*` / `metapool.locks.*` / `metapool.objects.*` YAML 声明**，
   示例应用默认纳管 datasource + rate-limiter + executor 三类；
   锁需要外部 Redis，故在 `application.yml` 中以注释形式给出完整配置（demo 保持开箱即跑）。
 

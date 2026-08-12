@@ -64,7 +64,7 @@
 | 适配器 | 底层库 | 能力接口 | 备注 / 风险 |
 |---|---|---|---|
 | `adapter-lettuce`（redis） | Lettuce | `Pool<StatefulConnection>` | Lettuce 单连接多路复用，"池"语义需想清楚是否真需要池化；也可只做治理不做 Pool |
-| `adapter-commons-pool2`（object） | Commons Pool2 | `Pool<T>` | 最直接对称 hikari，低风险，适合先做 |
+| ~~`adapter-commons-pool2`（object）~~ | Commons Pool2 | `Pool<T>` | ✅ **已完成 2026-08-12** |
 | ~~`adapter-jdk-executor`（executor）~~ | JDK ThreadPoolExecutor | `ManagedExecutor` | ✅ **已完成 2026-08-12** |
 | ~~`adapter-redisson`（lock）~~ | Redisson | `DistributedLock` | ✅ **已完成 2026-08-12**，取舍见 [`adapter-redisson.md`](adapter-redisson.md) |
 | `adapter-netty`（memory） | Netty `PooledByteBufAllocator` | `Pool<ByteBuf>` 或自定义 | 堆外内存，度量口径与释放安全性需谨慎 |
@@ -99,6 +99,30 @@
 - **它不实现 `Tunable`** —— 没有运行时可调参数就不实现，可选能力接口正常工作的证据。
 - 完整论证见 [`adapter-redisson.md`](adapter-redisson.md)（**面试素材**：为什么先做它、
   牺牲了什么、怎么让代价可见）。
+
+### ✅ `adapter-commons-pool2` 完成记录（2026-08-12）
+
+低风险的对称实现，但落地时暴露了两个**它和 Hikari 不同**的点，都值得记住：
+
+1. **通用对象池没有「自带工厂」**。Hikari 给个 JDBC URL 就知道怎么造 `Connection`；
+   Commons Pool2 不知道怎么造 `T`，必须拿到使用方的 `PooledObjectFactory`，而工厂对象
+   写不进 YAML。若不给 `factory-class` 反射路径，`ResourceAdapterFactory.create()` 就只能
+   一律抛异常，SPI 对称性（§2.8）当场破掉。**拍板：做 `factory-class`**，三项校验构造期
+   fail-fast（类存在 / 确实实现该接口 / 有无参构造），错误消息里同时给出「改用编程式」的出路。
+   反射只用于按名实例化一个类，不涉及改字段。
+
+2. 🎯 **`borrow(Duration)` 在这里是真超时**，而 Hikari 只能以配置项为界、参数仅作提示。
+   同一个接口方法在两个实现上语义强弱不同，**两边 javadoc 都写清了**。
+   这不是 LSP 破坏——契约本就是「最多等这么久」的上界语义，Hikari 给出的上界更严；
+   但调用方若指望「传 5s 就能等 5s」，在 Hikari 上会失望，所以必须写明。
+   顺带兑现了本文件 P2 里「`Pool.borrow(Duration)` 真超时」那条待办（在本适配器上天然成立）。
+
+另外**对照 P-19 得到一条反向结论**：Commons Pool2 的四个容量 setter **互不校验**
+（`minIdle > maxIdle` 也照单全收），所以这里**不需要** jdk-executor 那种按方向排序的逻辑。
+该结论有测试坐实（`tune_minIdleAboveMaxIdle_isAcceptedByPool2_noOrderingHazard`），不凭印象。
+
+「真超时」那条测试已用探针验证是承重的：把 `borrowObject(timeout)` 换成 `borrowObject()` 后，
+用例立刻以「实测只等了 211ms（配置值）而非传入的 1500ms」失败。
 
 **每落一个 adapter 同步做**：examples 里纳管它、Grafana 看板加对应面板、README 模块表更新（两版）。
 

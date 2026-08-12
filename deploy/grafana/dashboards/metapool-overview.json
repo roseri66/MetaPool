@@ -627,6 +627,161 @@
         }
       ],
       "description": "🔴 **正常情况下应恒为 0。**\n\n不为 0 意味着业务执行超过了租约：锁已自动释放、另一个进程可能已拿到同一把锁，而 MetaPool 的 DistributedLock 不提供 fencing token，下游无法拒绝过期持有者的迟到写入。\n\n处置：调大 leaseTime（建议为业务耗时的 3~5 倍）或缩短临界区。完整论证见 docs/design/adapter-redisson.md。\n\n口径说明：这是**近似值** —— 真正的到期发生在 Redis 侧，进程内只能在 close() 时发现「锁已不归我们」。"
+    },
+    {
+      "type": "row",
+      "title": "Object pool (对象池)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Objects by state",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_object_active{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · active"
+        },
+        {
+          "refId": "B",
+          "expr": "metapool_object_idle{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · idle"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Waiters (pending borrows)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_object_pending{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · waiting"
+        }
+      ],
+      "description": "正在等待借用的线程数。\n\n**这是对象池的领先指标**：active 打满只说明池在满负荷工作，pending 起来才说明容量真的不够了 —— 健康判定也正是按「耗尽 **且** 有人排队」才报 DEGRADED。"
+    },
+    {
+      "type": "timeseries",
+      "title": "Borrow vs Release (per second)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_object_borrowed_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · borrowed"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (metapool_resource) (rate(metapool_object_released_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · released"
+        }
+      ],
+      "description": "borrowed 与 released 的累计速率应当**基本重合**。\n\n两条曲线持续分叉 = 有对象借出后没归还（漏 release）。\n\n口径：只统计经 Pool 能力（borrow/release）的流量，两者可比可对账（坑 P-12 的教训）。"
     }
   ]
 }

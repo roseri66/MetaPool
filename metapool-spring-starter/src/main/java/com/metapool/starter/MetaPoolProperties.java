@@ -34,6 +34,12 @@ import java.util.Map;
  *     order-lock:
  *       address: redis://127.0.0.1:6379
  *       key-prefix: "myapp:lock:"
+ *   objects:
+ *     buffer-pool:
+ *       factory-class: com.example.MyPooledObjectFactory   # 必填，须有无参构造
+ *       max-total: 16
+ *       max-wait: 3s
+ *       tunable: [max-total, max-idle]
  * }</pre>
  *
  * <p>注意 {@code locks} 没有 {@code tunable}：Redisson 锁的 {@code waitTime} / {@code leaseTime}
@@ -64,6 +70,9 @@ public class MetaPoolProperties {
 
     /** 分布式锁（type=lock），名称 → 直通 Redisson 的属性。 */
     private Map<String, Map<String, Object>> locks = new LinkedHashMap<>();
+
+    /** 通用对象池（type=object），名称 → 直通 Commons Pool2 的属性（须含 {@code factory-class}）。 */
+    private Map<String, Map<String, Object>> objects = new LinkedHashMap<>();
 
     public boolean isEnabled() {
         return enabled;
@@ -103,5 +112,13 @@ public class MetaPoolProperties {
 
     public void setLocks(Map<String, Map<String, Object>> locks) {
         this.locks = locks;
+    }
+
+    public Map<String, Map<String, Object>> getObjects() {
+        return objects;
+    }
+
+    public void setObjects(Map<String, Map<String, Object>> objects) {
+        this.objects = objects;
     }
 }
