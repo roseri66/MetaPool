@@ -42,6 +42,7 @@
         <module>metapool-adapter-bucket4j</module>
         <module>metapool-adapter-jdk-executor</module>
         <module>metapool-adapter-redisson</module>
+        <module>metapool-adapter-commons-pool2</module>
         <module>metapool-spring-starter</module>
         <module>metapool-examples</module>
         <module>metapool-benchmark</module>
@@ -91,6 +92,7 @@
             升级 Redisson 时须复核这两族的最终版本没被拽偏。
         -->
         <redisson.version>3.35.0</redisson.version>
+        <commons-pool2.version>2.12.1</commons-pool2.version>
         <h2.version>2.2.224</h2.version>
 
         <!-- 插件 -->
@@ -163,6 +165,13 @@
                 <artifactId>jmh-generator-annprocess</artifactId>
                 <version>${jmh.version}</version>
                 <scope>test</scope>
+            </dependency>
+
+            <!-- Commons Pool2：metapool-adapter-commons-pool2 的编译期依赖 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-pool2</artifactId>
+                <version>${commons-pool2.version}</version>
             </dependency>
 
             <!-- Redisson：metapool-adapter-redisson 的编译期依赖 -->

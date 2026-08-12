@@ -263,6 +263,12 @@ public final class HikariAdapter implements ManagedResource, Pool<Connection>, T
      * <p><b>阻抗说明</b>：HikariCP 的获取超时由配置项 {@code connectionTimeout} 统一治理，
      * 不支持逐次调用传入超时。本方法以配置的 {@code connectionTimeout} 为有效界，{@code timeout} 参数仅作提示；
      * 池耗尽/超时统一映射为 {@link PoolExhaustedException}。
+     *
+     * <p><b>⚠️ 同一接口方法在不同实现上语义强弱不同</b>：{@code CommonsPool2Adapter} 的
+     * {@code borrow(Duration)} 是<b>真超时</b>（Commons Pool2 原生支持 {@code borrowObject(Duration)}），
+     * 而这里只是尽力而为。这不是 LSP 破坏 —— 契约本就是「最多等这么久」的上界语义，本实现给出的
+     * 上界更严（由配置决定）；但调用方若指望「传 5s 就一定能等 5s」，在这里会失望，
+     * 故如实写在两边的 javadoc 里，不让人以为哪儿都一样。
      */
     @Override
     public Connection borrow(Duration timeout) throws InterruptedException, PoolExhaustedException {
