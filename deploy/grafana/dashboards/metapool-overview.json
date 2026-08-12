@@ -1,23 +1,36 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "graphTooltip": 1,
   "schemaVersion": 39,
   "title": "MetaPool — Resource Governance Overview",
   "uid": "metapool-overview",
-  "tags": ["metapool"],
-  "time": { "from": "now-30m", "to": "now" },
+  "tags": [
+    "metapool"
+  ],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
   "refresh": "10s",
   "templating": {
     "list": [
       {
         "name": "resource",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "query": "label_values(metapool_datasource_connections, metapool_resource)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(metapool_resource)",
         "includeAll": true,
         "multi": true,
-        "current": { "text": "All", "value": "$__all" }
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
       }
     ]
   },
@@ -25,59 +38,411 @@
     {
       "type": "row",
       "title": "Datasource (连接池)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "type": "timeseries",
       "title": "Connections by state",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 1 },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" }, "unit": "short" }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "refId": "A", "expr": "metapool_datasource_connections_active{metapool_resource=~\"$resource\"}", "legendFormat": "{{metapool_resource}} · active" },
-        { "refId": "B", "expr": "metapool_datasource_connections_idle{metapool_resource=~\"$resource\"}", "legendFormat": "{{metapool_resource}} · idle" },
-        { "refId": "C", "expr": "metapool_datasource_connections{metapool_resource=~\"$resource\"}", "legendFormat": "{{metapool_resource}} · total" },
-        { "refId": "D", "expr": "metapool_datasource_connections_pending{metapool_resource=~\"$resource\"}", "legendFormat": "{{metapool_resource}} · pending" }
+        {
+          "refId": "A",
+          "expr": "metapool_datasource_connections_active{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · active"
+        },
+        {
+          "refId": "B",
+          "expr": "metapool_datasource_connections_idle{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · idle"
+        },
+        {
+          "refId": "C",
+          "expr": "metapool_datasource_connections{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · total"
+        },
+        {
+          "refId": "D",
+          "expr": "metapool_datasource_connections_pending{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · pending"
+        }
       ]
     },
     {
       "type": "stat",
       "title": "Pending acquisitions",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 } ] } }, "overrides": [] },
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(metapool_datasource_connections_pending{metapool_resource=~\"$resource\"})", "legendFormat": "pending" }
+        {
+          "refId": "A",
+          "expr": "sum(metapool_datasource_connections_pending{metapool_resource=~\"$resource\"})",
+          "legendFormat": "pending"
+        }
       ]
     },
     {
       "type": "row",
       "title": "Rate limiter (限流)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      }
     },
     {
       "type": "timeseries",
       "title": "Available tokens",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" }, "unit": "short" }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "refId": "A", "expr": "metapool_ratelimiter_available_tokens", "legendFormat": "{{metapool_resource}}" }
+        {
+          "refId": "A",
+          "expr": "metapool_ratelimiter_available_tokens",
+          "legendFormat": "{{metapool_resource}}"
+        }
       ]
     },
     {
       "type": "timeseries",
       "title": "Acquire vs Reject (per second)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 10 },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" }, "unit": "reqps" }, "overrides": [ { "matcher": { "id": "byRegexp", "options": ".*reject.*" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] } ] },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*reject.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (metapool_resource) (rate(metapool_ratelimiter_acquired_total[1m]))", "legendFormat": "{{metapool_resource}} · acquired" },
-        { "refId": "B", "expr": "sum by (metapool_resource) (rate(metapool_ratelimiter_rejected_total[1m]))", "legendFormat": "{{metapool_resource}} · rejected" }
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_ratelimiter_acquired_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · acquired"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (metapool_resource) (rate(metapool_ratelimiter_rejected_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · rejected"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Executor (线程池)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Threads: active vs pool size",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_executor_active{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · active"
+        },
+        {
+          "refId": "B",
+          "expr": "metapool_executor_pool_size{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · pool size"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue depth",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_executor_queue_size{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · queued"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Completed vs Rejected (per second)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*reject.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_executor_completed_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · completed"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (metapool_resource) (rate(metapool_executor_rejected_total[1m]))",
+          "legendFormat": "{{metapool_resource}} · rejected"
+        }
       ]
     }
   ]

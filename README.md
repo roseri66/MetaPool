@@ -182,11 +182,16 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 | `metapool-core` | 控制面实现：`DefaultResourceManager` + `ResourceAdapterLoader` + `MetaPool` 入口 |
 | `metapool-adapter-hikari` | 把 HikariCP 纳入治理（`datasource`） |
 | `metapool-adapter-bucket4j` | 把 Bucket4j 纳入治理（`rate-limiter`，非池资源） |
+| `metapool-adapter-jdk-executor` | 把 JDK `ThreadPoolExecutor` 纳入治理（`executor`，非池资源） |
 | `metapool-spring-starter` | Spring Boot 自动装配 + Actuator health/tune 端点 |
 
 ## 扩展新资源类型
 
-实现 `ResourceAdapterFactory`，经 `META-INF/services` 注册，类路径多一个 jar 即多支持一种资源，核心零改动。规划中的适配器：Lettuce（redis）、Commons-Pool2（object）、JDK Executor（executor）、Redisson（lock）、Netty（memory）。
+实现 `ResourceAdapterFactory`，经 `META-INF/services` 注册，类路径多一个 jar 即多支持一种资源，核心零改动。
+
+**这不是宣传语，是可核验的事实**：加入 `metapool-adapter-jdk-executor` 时，`metapool-core` 与 `metapool-common` **零改动**（`git show 8685ee3 --stat` 可查）。
+
+规划中的适配器：Commons-Pool2（object）、Redisson（lock）、Lettuce（redis）、Netty（memory）。
 
 ---
 
@@ -205,7 +210,8 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M2 | HikariCP 适配器 | ✅ |
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
-| 扩展 | redis / object / executor / lock / memory 适配器（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 📋 |
+| 2.1 P0 | GitHub Actions CI + `DistributedLock` / `ManagedExecutor` 能力接口 | ✅ |
+| 2.1 P1 | `executor` 适配器（JDK 线程池）已落地；object / lock / redis / memory 待做（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 🚧 |
 | 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.0.1`（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 | CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 

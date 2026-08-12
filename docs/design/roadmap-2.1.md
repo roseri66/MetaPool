@@ -65,13 +65,31 @@
 |---|---|---|---|
 | `adapter-lettuce`（redis） | Lettuce | `Pool<StatefulConnection>` | Lettuce 单连接多路复用，"池"语义需想清楚是否真需要池化；也可只做治理不做 Pool |
 | `adapter-commons-pool2`（object） | Commons Pool2 | `Pool<T>` | 最直接对称 hikari，低风险，适合先做 |
-| `adapter-jdk-executor`（executor） | JDK ThreadPoolExecutor | `ManagedExecutor`（见 P0#2） | 线程池不是池，验证 `ManagedExecutor` 抽象；tune 核心/最大线程数 |
+| ~~`adapter-jdk-executor`（executor）~~ | JDK ThreadPoolExecutor | `ManagedExecutor` | ✅ **已完成 2026-08-12** |
 | `adapter-redisson`（lock） | Redisson | `DistributedLock`（见 P0#2） | 依赖 Redis，测试用 Testcontainers Redis；看门狗续期语义 |
 | `adapter-netty`（memory） | Netty `PooledByteBufAllocator` | `Pool<ByteBuf>` 或自定义 | 堆外内存，度量口径与释放安全性需谨慎 |
 
-**建议顺序**：commons-pool2（最对称、最低风险）→ jdk-executor（验证 `ManagedExecutor`）→ redisson（验证 `DistributedLock`）→ lettuce → netty。
+**原建议顺序**：commons-pool2（最对称、最低风险）→ jdk-executor → redisson → lettuce → netty。
 
-**每落一个 adapter 同步做**：examples 里纳管它、Grafana 看板加对应面板、README 模块表更新。
+**实际执行时调整为先做 jdk-executor，理由记录在此**：commons-pool2 挂的是 `Pool<T>`，
+已被 HikariCP 验证过两遍，做完只能证明「会照抄」；jdk-executor 挂的才是 P0 新定义、
+零实现的 `ManagedExecutor`。**接口设计的风险远大于适配器实现的风险，应当先暴露。**
+附带好处：JDK 自带，无外部依赖、无需 Docker，本机即可跑全绿。
+
+### ✅ `adapter-jdk-executor` 完成记录（2026-08-12）
+
+- **结论：`ManagedExecutor` 抽对了** —— `metapool-core` 与 `metapool-common` 零改动
+  （RULES §2.8 的验收线）。四个能力全部落地，27 条测试。
+- 实现中确立的三条边界，后续 adapter 可直接沿用：
+  1. `submit()` 用 `execute` 而非 `CompletableFuture.supplyAsync` —— 饱和被拒时异常必须
+     **同步抛出**，而不是变成异常完成的 future。「没受理」和「受理了但失败了」是两件事。
+  2. `unwrap()` 维持返回裸 `ExecutorService`，**不包防护代理**。那个代理自己就是 P-07 复发
+     （是个 `ExecutorService` 却在核心方法上抛异常）。真正的边界是**默认路径 vs 逃生舱**。
+  3. 底层运行时改不了的参数（如队列容量）**不进 `Tunable` 白名单** —— 放进去等于承诺一件
+     底层做不到的事，是 P-07 的思路错误换到调参这一面。
+- 新增台账 P-19 / P-20 / P-21。
+
+**每落一个 adapter 同步做**：examples 里纳管它、Grafana 看板加对应面板、README 模块表更新（两版）。
 
 ---
 

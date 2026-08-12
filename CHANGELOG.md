@@ -4,6 +4,58 @@
 
 ---
 
+## [未发布] 2.1.0
+
+无破坏性变更：`metapool-common` 已有接口与值对象的签名与 2.0.1 完全兼容，
+2.0.x 的 YAML 配置无需改动即可升级。
+
+### 新增
+
+- **`DistributedLock` / `LockHandle` / `ManagedExecutor` 能力接口**（`metapool-common`）。
+  设计与五条拍板决策见 [`docs/design/metapool-2.1-capabilities.md`](docs/design/metapool-2.1-capabilities.md)。
+  其中两条最值得知道：
+  - **锁只发放持有凭证，不提供 `unlock(key)`** —— 后者无法判断调用方是否持有者，
+    会导致「租约到期后解了别人的锁」。凭证 `extends AutoCloseable`，try-with-resources 即正确用法。
+  - **`ManagedExecutor extends Executor` 但刻意不 extends `ExecutorService`** ——
+    后者带 `shutdown()`，等于给业务代码开了一个绕过控制面的第二停机入口。
+
+- **`metapool-adapter-jdk-executor`**：把 JDK `ThreadPoolExecutor` 纳入治理（类型 `executor`）。
+  `ManagedExecutor` 的第一个实现，四个能力全部落地：生命周期（三段式优雅停机）、
+  统一 tag 指标（`metapool.executor.*`）、`ManagedExecutor`、以及经 JDK 原生 setter
+  热调 `core-pool-size` / `maximum-pool-size`。
+  **加入它时 `metapool-core` 与 `metapool-common` 零改动** —— SPI 扩展点的可核验证据。
+
+- **starter 支持 `metapool.executors.*` YAML 声明**，示例应用同时纳管
+  datasource + rate-limiter + executor 三类资源。
+
+### 行为说明（新资源类型自带的边界）
+
+- **线程池饱和时 `RejectedExecutionException` 原样透传**，不包装成 `MetaPoolException`。
+  该异常类型本身是生态契约的一部分（`CompletableFuture`、Spring `@Async` 都按它做处理），
+  包装即破坏互操作。MetaPool **自己**产生的错误仍是 `MetaPoolException` + `ErrorCode`。
+- **`queue-capacity` 默认无界**（与 `Executors.newFixedThreadPool` 一致），
+  此时 `maximum-pool-size` **不生效** —— 这是 JDK `ThreadPoolExecutor` 的既有行为
+  （线程数到 core 后任务只进队列），MetaPool 不替它做决定，但在适配器类注释中明确写出。
+  要让 max 生效必须配有界队列。
+- **`queue-capacity` 不可热调**：JDK 队列容量构造时确定，放进白名单等于承诺一件底层做不到的事。
+
+### 文档
+
+- 踩坑台账新增 P-19（两个 size setter 各自校验 `core<=max`，逐个应用会炸在中间态）、
+  P-20（`SynchronousQueue.remainingCapacity()` 恒为 0，只看队列会误判健康）、
+  P-21（有状态资源在缓存复用的 Spring 上下文里造成顺序依赖的假失败）。
+- 修正 RULES 两处与实际不符：commit 尾注规则（2026-07-29 已全历史清除 AI 尾注）、
+  P-03 的 maven-enforcer 根治项（早已落地，此前仍标「待办」）。
+
+### 已知局限
+
+- 配置绑定为每个内置类型硬编码一个 Map 字段（`datasources` / `rate-limiters` / `executors`），
+  因此**第三方经 SPI 扩展的资源类型暂时无法用 YAML 声明**，只能编程式接入。
+  `type()` 用 String 而非 enum 的本意恰恰是不挡第三方扩展，配置层把这个口子堵回去了一半。
+  通用化方案（`metapool.resources.<type>.<name>`）属公开配置面变更，待专门设计。
+
+---
+
 ## [2.0.1] — 2026-07-26
 
 **补丁版本。强烈建议所有 2.0.0 使用方升级** —— 2.0.0 的 `metapool-spring-starter`

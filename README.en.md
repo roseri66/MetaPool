@@ -204,14 +204,18 @@ is in [`docs/design/metapool-2.0.md`](docs/design/metapool-2.0.md) (Chinese).
 | `metapool-core` | Control plane: `DefaultResourceManager`, `ResourceAdapterLoader`, the `MetaPool` entry point |
 | `metapool-adapter-hikari` | Brings HikariCP under governance (`datasource`) |
 | `metapool-adapter-bucket4j` | Brings Bucket4j under governance (`rate-limiter` — a non-pool resource) |
+| `metapool-adapter-jdk-executor` | Brings the JDK `ThreadPoolExecutor` under governance (`executor` — a non-pool resource) |
 | `metapool-spring-starter` | Spring Boot auto-configuration + Actuator health/tune endpoints |
 
 ## Supporting a new resource type
 
 Implement `ResourceAdapterFactory` and register it through `META-INF/services`. One more jar on the
-classpath means one more supported resource type, with **zero changes to the core**. Planned
-adapters: Lettuce (redis), Commons-Pool2 (object), JDK Executor (executor), Redisson (lock),
-Netty (memory).
+classpath means one more supported resource type, with **zero changes to the core**.
+
+That claim is verifiable rather than aspirational: adding `metapool-adapter-jdk-executor` touched
+**neither `metapool-core` nor `metapool-common`** (see `git show 8685ee3 --stat`).
+
+Planned adapters: Commons-Pool2 (object), Redisson (lock), Lettuce (redis), Netty (memory).
 
 ---
 
@@ -254,7 +258,8 @@ unavailable it skips itself rather than failing the build.
 | M4 | Docs / examples / JMH benchmark / Testcontainers | ✅ |
 | Release | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ `2.0.1` on Maven Central |
 | CI | GitHub Actions: ubuntu + windows × JDK 17, plus a manual release workflow | ✅ |
-| Next | redis / object / executor / lock / memory adapters — see the [2.1 roadmap](docs/design/roadmap-2.1.md) | 📋 |
+| 2.1 P0 | `DistributedLock` / `ManagedExecutor` capability interfaces | ✅ |
+| 2.1 P1 | `executor` adapter (JDK thread pool) landed; object / lock / redis / memory to go — see the [2.1 roadmap](docs/design/roadmap-2.1.md) | 🚧 |
 
 ## What this project is, and is not
 
