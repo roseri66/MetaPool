@@ -113,7 +113,37 @@ groups:
             锁 {{ $labels.metapool_resource }} 在过去 5 分钟平均每秒超过 0.5 次获取失败。
             要么临界区太长，要么锁粒度太粗（考虑按更细的 key 拆分）。
 
-      # ── 8. 对象池耗尽：借光且有人排队 ──
+      # ── 8. 🔴 Redis 连接反复重连：Lettuce 自动重连把网络抖动掩盖了 ──
+      # 业务侧只会觉得「偶尔慢一下」，没有任何人知道底下在反复重连。
+      # 不埋这条告警，这个问题在生产上基本不可能被发现。
+      - alert: RedisReconnecting
+        expr: sum by (metapool_resource) (rate(metapool_redis_disconnects_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: redis
+        annotations:
+          summary: "MetaPool Redis 连接反复断开重连"
+          description: >
+            Redis 资源 {{ $labels.metapool_resource }} 在过去 5 分钟持续出现断连。
+            Lettuce 会自动重连，所以业务多半只表现为偶发变慢——但链路确实在抖。
+            排查方向：网络、Redis 侧的 timeout / maxmemory 驱逐、或中间的负载均衡器空闲超时。
+
+      # ── 9. Redis 连接长时间不可用 ──
+      # 注意判据是「持续」5 分钟：短暂掉线是自动重连的正常过程，不该告警。
+      - alert: RedisConnectionDown
+        expr: metapool_redis_connection_open == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: redis
+        annotations:
+          summary: "MetaPool Redis 连接已持续 5 分钟未恢复"
+          description: >
+            Redis 资源 {{ $labels.metapool_resource }} 的连接持续 5 分钟处于断开状态，
+            自动重连没能恢复它。此时 MetaPool 的健康状态为 DEGRADED（若关闭了 auto-reconnect 则为 DOWN）。
+
+      # ── 10. 对象池耗尽：借光且有人排队 ──
       - alert: ObjectPoolExhausted
         expr: metapool_object_pending > 0 and metapool_object_idle == 0
         for: 2m

@@ -782,6 +782,188 @@
         }
       ],
       "description": "borrowed 与 released 的累计速率应当**基本重合**。\n\n两条曲线持续分叉 = 有对象借出后没归还（漏 release）。\n\n口径：只统计经 Pool 能力（borrow/release）的流量，两者可比可对账（坑 P-12 的教训）。"
+    },
+    {
+      "type": "row",
+      "title": "Redis (Lettuce 单连接多路复用)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Connection open",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 46
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "metapool_redis_connection_open{metapool_resource=~\"$resource\"}",
+          "legendFormat": "{{metapool_resource}} · open"
+        }
+      ],
+      "description": "1 = 连接打开，0 = 未连接。\n\n注意短暂掉到 0 **不一定是故障** —— Lettuce 正在自动重连，健康状态此时报 DEGRADED 而非 DOWN。「正在自愈」和「已经坏了」是两回事。"
+    },
+    {
+      "type": "timeseries",
+      "title": "Disconnects (per second)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 46
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_redis_disconnects_total[5m]))",
+          "legendFormat": "{{metapool_resource}} · disconnects"
+        }
+      ],
+      "description": "🔴 **本适配器最该盯的一条。**\n\nLettuce 默认自动重连，会把网络抖动**掩盖掉** —— 业务侧只觉得「偶尔慢一下」，没有任何人知道底下在反复重连。这条曲线就是把那个不可见的问题变可见。\n\n持续上涨 = 到 Redis 的链路在抖。稳态应当平坦。"
+    },
+    {
+      "type": "timeseries",
+      "title": "Connects vs Exceptions (per second)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 46
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*exception.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metapool_resource) (rate(metapool_redis_connects_total[5m]))",
+          "legendFormat": "{{metapool_resource}} · connects"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (metapool_resource) (rate(metapool_redis_exceptions_total[5m]))",
+          "legendFormat": "{{metapool_resource}} · exceptions"
+        }
+      ]
     }
   ]
 }

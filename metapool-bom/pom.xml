@@ -55,6 +55,11 @@
             </dependency>
             <dependency>
                 <groupId>io.github.roseri66</groupId>
+                <artifactId>metapool-adapter-lettuce</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.roseri66</groupId>
                 <artifactId>metapool-spring-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>

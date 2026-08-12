@@ -4,6 +4,41 @@
 
 ---
 
+## [未发布] 2.3.0
+
+无破坏性变更。
+
+### 新增
+
+- **`metapool-adapter-lettuce`**：把 Lettuce 的 Redis 连接纳入治理（类型 `redis`）。核心零改动。
+  设计全文见 [`docs/design/adapter-lettuce.md`](docs/design/adapter-lettuce.md)。
+
+  🎯 **它刻意不实现 `Pool`。** Lettuce 是单连接多路复用——一个连接天然线程安全、被所有线程共享、
+  命令在其上流水线化，**没有「借出/归还」这回事**。项目里已有两个 `Pool` 实现，于是
+  「别的 adapter 都实现了 Pool，这个也该实现」听起来很自然，**但那是用一致性绑架语义**，
+  与 1.0 把所有资源硬塞进 `acquire/release` 同源（P-07）。
+
+  区别在于这次的错误会**很不明显**：假的 `Pool` 实现能跑、测试也会绿，直到某人真按池语义去用它
+  （比如在"借来"的连接上跑 `MULTI/EXEC` 事务，却发现别人的命令混了进来）。
+  业务改用 `LettuceAdapter.connection()` 拿原生连接——那个耦合本来就存在（发 Redis 命令必然用
+  Lettuce 的 API），套一层 `Pool` 不解耦任何东西，只会多一层假抽象。
+
+  **但它实现 `Tunable`**（`command-timeout` 运行时真可写），而 Redisson 适配器不实现——
+  同一条判据（有没有真参数），两个相反结论。
+
+- **starter 支持 `metapool.redis.*` YAML 声明。**
+
+### 行为说明
+
+- **`health()` 的 DEGRADED 表示「正在自动重连」，不是故障。** Lettuce 默认自动重连，
+  连接短暂断开时报 DOWN 会造成误报警。判据与「线程池饱和 / 连接池借满不等于故障」同源。
+- **指标只报连接层事件**（open / connects / disconnects / exceptions）。业务直接用原生 API 发命令，
+  适配器观测不到命令量，就不去猜（坑 P-12）。其中 `disconnects` 最有价值：
+  Lettuce 的自动重连会把网络抖动**掩盖掉**，业务侧只觉得「偶尔慢一下」，
+  不埋这条曲线没人看得见。
+
+---
+
 ## [2.2.0] — 2026-08-12
 
 无破坏性变更。本版不加适配器 —— 2.1 已证明的三件事（治理五类异构资源 / 能力接口经得起实现检验 /

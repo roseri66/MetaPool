@@ -223,6 +223,7 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 | `metapool-adapter-jdk-executor` | 把 JDK `ThreadPoolExecutor` 纳入治理（`executor`，非池资源） |
 | `metapool-adapter-redisson` | 把 Redisson 分布式锁纳入治理（`lock`，非池资源，**不实现 `Tunable`**） |
 | `metapool-adapter-commons-pool2` | 把 Commons Pool2 通用对象池纳入治理（`object`，**真·池**） |
+| `metapool-adapter-lettuce` | 把 Lettuce Redis 连接纳入治理（`redis`，**刻意不实现 `Pool`**——单连接多路复用没有借还语义） |
 | `metapool-spring-starter` | Spring Boot 自动装配 + Actuator health/tune 端点 |
 
 ## 扩展新资源类型
@@ -231,7 +232,7 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # Prometheus + Grafana +
 
 **这不是宣传语，是可核验的事实**：加入 `metapool-adapter-jdk-executor` 时，`metapool-core` 与 `metapool-common` **零改动**（`git show 8685ee3 --stat` 可查）。
 
-规划中的适配器：Lettuce（redis）、Netty（memory）。
+规划中的适配器：Netty（memory）。
 
 **第三方类型也能用 YAML 声明**（2.1 起）：
 
@@ -268,7 +269,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M3 | Bucket4j 适配器 + 控制面 + starter | ✅ |
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 2.1 P0 | GitHub Actions CI + `DistributedLock` / `ManagedExecutor` 能力接口 | ✅ |
-| 2.1 P1 | `executor`（JDK 线程池）+ `lock`（Redisson）+ `object`（Commons Pool2）适配器已落地；redis / memory 待做（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 🚧 |
+| 2.1–2.3 | 适配器谱系：`executor` / `lock` / `object` / `redis` 已落地，memory 待做（见 [2.2 路线图](docs/design/roadmap-2.2.md)） | 🚧 |
 | 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.2.0`，9 个构件（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 | CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 

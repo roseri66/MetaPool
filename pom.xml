@@ -43,6 +43,7 @@
         <module>metapool-adapter-jdk-executor</module>
         <module>metapool-adapter-redisson</module>
         <module>metapool-adapter-commons-pool2</module>
+        <module>metapool-adapter-lettuce</module>
         <module>metapool-spring-starter</module>
         <module>metapool-examples</module>
         <module>metapool-benchmark</module>
@@ -93,6 +94,12 @@
         -->
         <redisson.version>3.35.0</redisson.version>
         <commons-pool2.version>2.12.1</commons-pool2.version>
+        <!--
+            Lettuce 不在 spring-boot-dependencies 的直接管理范围内（Boot 通过 spring-data-redis 引它，
+            而本项目不依赖 spring-data），故自设版本。它传递 netty / reactor，两者与 Redisson 同族，
+            升级时须一并复核（同 P-16 的检查动作）。
+        -->
+        <lettuce.version>6.5.5.RELEASE</lettuce.version>
         <h2.version>2.2.224</h2.version>
 
         <!-- 插件 -->
@@ -165,6 +172,13 @@
                 <artifactId>jmh-generator-annprocess</artifactId>
                 <version>${jmh.version}</version>
                 <scope>test</scope>
+            </dependency>
+
+            <!-- Lettuce：metapool-adapter-lettuce 的编译期依赖 -->
+            <dependency>
+                <groupId>io.lettuce</groupId>
+                <artifactId>lettuce-core</artifactId>
+                <version>${lettuce.version}</version>
             </dependency>
 
             <!-- Commons Pool2：metapool-adapter-commons-pool2 的编译期依赖 -->

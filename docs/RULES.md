@@ -49,13 +49,14 @@
 ## 4. 测试规则
 
 1. 每个新能力至少一条测试；**修一个 bug 必须补一条会失败的回归测试**。
-2. 合入前 `mvn clean test` 必须全绿。当前基线（2026-08-12 实测 `mvn -B clean verify` 汇总）：
-   - **有 Docker：144 通过 + 0 跳过**
-   - **无 Docker：136 通过 + 8 跳过**
+2. 合入前 `mvn clean test` 必须全绿。当前基线（2026-08-13 实测 `mvn -B clean verify` 汇总）：
+   - **有 Docker：167 通过 + 0 跳过**
+   - **无 Docker：152 通过 + 15 跳过**
 
-   那 8 条是需要真后端的集成测试：`HikariAdapterPostgresTest`（1，PG）与
-   `RedissonLockAdapterRedisTest`（7，Redis）。它们必须**可跳过而不使构建失败**，
-   但**不许因此不写**——互斥、租约到期这类语义不接真后端根本验不了。
+   那 15 条是需要真后端的集成测试：`HikariAdapterPostgresTest`（1，PG）、
+   `RedissonLockAdapterRedisTest`（7，Redis）、`LettuceAdapterRedisTest`（7，Redis）。
+   它们必须**可跳过而不使构建失败**，但**不许因此不写** ——
+   互斥、租约到期、共享连接的并发安全，这类语义不接真后端根本验不了。
    改动基线数字时必须是实测值（`Tests run` 汇总），不许估。
 3. **报告测试结果时必须同时报「通过数」和「跳过数」。** 只说「构建绿了」不够：
    Testcontainers 连不上 Docker 时会把集成测试**静默跳过**，而构建依旧 BUILD SUCCESS（坑 P-22）。

@@ -90,6 +90,9 @@ public class MetaPoolProperties {
     /** 通用对象池（type=object），名称 → 直通 Commons Pool2 的属性（须含 {@code factory-class}）。 */
     private Map<String, Map<String, Object>> objects = new LinkedHashMap<>();
 
+    /** Redis 连接（type=redis），名称 → 直通 Lettuce 的属性。 */
+    private Map<String, Map<String, Object>> redis = new LinkedHashMap<>();
+
     /**
      * 通用分段：<b>类型 → 名称 → 属性</b>。类型任意，包括第三方经 SPI 扩展的类型。
      *
@@ -144,6 +147,14 @@ public class MetaPoolProperties {
 
     public void setObjects(Map<String, Map<String, Object>> objects) {
         this.objects = objects;
+    }
+
+    public Map<String, Map<String, Object>> getRedis() {
+        return redis;
+    }
+
+    public void setRedis(Map<String, Map<String, Object>> redis) {
+        this.redis = redis;
     }
 
     public Map<String, Map<String, Map<String, Object>>> getResources() {
