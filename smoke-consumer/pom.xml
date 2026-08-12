@@ -35,7 +35,7 @@
     <properties>
         <java.version>17</java.version>
         <!-- 要验证哪个已发布版本；发版后用 -Dmetapool.version=X.Y.Z 覆盖 -->
-        <metapool.version>2.3.0</metapool.version>
+        <metapool.version>2.4.0</metapool.version>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 
