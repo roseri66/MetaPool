@@ -74,13 +74,13 @@
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-spring-starter</artifactId>
-    <version>2.0.1</version>
+    <version>2.1.0</version>
 </dependency>
 <!-- 按需引入所用资源类型的 adapter（SPI 自动发现） -->
 <dependency>
     <groupId>io.github.roseri66</groupId>
     <artifactId>metapool-adapter-hikari</artifactId>
-    <version>2.0.1</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 
@@ -231,7 +231,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 2.1 P0 | GitHub Actions CI + `DistributedLock` / `ManagedExecutor` 能力接口 | ✅ |
 | 2.1 P1 | `executor`（JDK 线程池）+ `lock`（Redisson）+ `object`（Commons Pool2）适配器已落地；redis / memory 待做（见 [2.1 路线图](docs/design/roadmap-2.1.md)） | 🚧 |
-| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.0.1`（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
+| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.1.0`，9 个构件（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 | CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 
 ## 这个项目是什么 / 不是什么
