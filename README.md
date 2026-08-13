@@ -280,7 +280,7 @@ mvn clean test      # JDK 17+，全模块编译 + 测试
 | M4 | 文档 / examples / JMH benchmark / Testcontainers | ✅ |
 | 2.1 P0 | GitHub Actions CI + `DistributedLock` / `ManagedExecutor` 能力接口 | ✅ |
 | 2.1–2.4 | 适配器谱系**已完整**：`datasource` / `rate-limiter` / `executor` / `lock` / `object` / `redis` / `memory` | ✅ |
-| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.4.0`，11 个构件（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
+| 发布 | BOM + `io.github.roseri66` groupId + Central `release` profile | ✅ 已发布 `2.4.0`，12 个构件（流程见 [`docs/PUBLISHING.md`](docs/PUBLISHING.md)） |
 | CI | GitHub Actions：ubuntu + windows × JDK 17；手动触发的发布 workflow | ✅ |
 
 ## 这个项目是什么 / 不是什么
